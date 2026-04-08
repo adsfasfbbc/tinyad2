@@ -1,125 +1,122 @@
-# VisualAD: Language-Free Zero-Shot Anomaly Detection via Vision Transformer
+# VisualAD 项目说明
 
-<p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/CVPR-2026-blue" alt="CVPR 2026"></a>
-  <a href="https://arxiv.org/abs/2603.07952"><img src="https://img.shields.io/badge/arXiv-2603.07952-b31b1b" alt="arXiv"></a>
-  <a href="#"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
-</p>
+本仓库包含两部分：
+1. **VisualAD 原始训练/测试流程**（`train.py`、`test.py`、`VisualAD_lib/`）
+2. **Phase 1 timm student 启动流程**（`train_timm_student.py`、`student/`、`scripts/run_timm_*.sh`）
 
-This is the official PyTorch implementation of:
+> 约束说明：开发过程中尽量不改动 VisualAD 原有文件，尤其是模型文件（`VisualAD_lib/*`）。
 
-> **VisualAD: Language-Free Zero-Shot Anomaly Detection via Vision Transformer**
->
-> *CVPR 2026*
+---
 
-## Highlights
-
-- **Language-Free**: VisualAD removes the text encoder entirely and learns anomaly/normal prototypes purely in the visual feature space.
-- **Two Learnable Tokens**: An anomaly token and a normal token are inserted into a frozen ViT, interacting with patch tokens through multi-layer self-attention to encode normality and abnormality.
-- **SCA & SAF Modules**: Spatial-Aware Cross-Attention (SCA) injects fine-grained spatial evidence into the tokens; Self-Alignment Function (SAF) recalibrates patch features before anomaly scoring.
-- **13 Benchmarks**: State-of-the-art performance across 6 industrial and 7 medical zero-shot anomaly detection benchmarks.
-- **Backbone Agnostic**: Adapts seamlessly to CLIP (ViT-L/14@336px) and DINOv2 (ViT-L/14).
-
-## Main Results
-
-### Image-Level ZSAD Performance (AUROC / F1-max / AP)
-
-| Dataset | WinCLIP | APRIL-GAN | AnomalyCLIP | AdaCLIP | **VisualAD (CLIP)** | **VisualAD (DINOv2)** |
-|:--|:--:|:--:|:--:|:--:|:--:|:--:|
-| MVTec-AD | 90.4 / 92.7 / 95.6 | 86.1 / 90.4 / 93.6 | 91.6 / 92.7 / 96.2 | 92.0 / 92.7 / 96.4 | **92.2 / 93.2 / 96.7** | 90.1 / 92.4 / 94.8 |
-| VisA | 75.6 / 78.2 / 78.8 | 77.4 / 78.6 / 80.9 | 81.0 / 80.3 / 84.4 | 79.7 / 79.6 / 83.2 | **84.7 / 82.5 / 87.6** | 83.1 / 81.4 / 86.8 |
-| BTAD | 68.2 / 67.8 / 70.9 | 73.7 / 68.7 / 69.9 | 88.7 / 86.0 / 90.6 | 90.0 / 87.2 / 91.5 | **94.9 / 93.9 / 97.0** | 88.2 / 84.7 / 89.7 |
-| KSDD2 | 93.5 / 86.4 / 94.2 | 90.4 / 82.9 / 92.0 | 91.9 / 84.5 / 93.4 | 94.9 / 90.3 / 96.2 | **98.0 / 93.9 / 98.3** | 97.7 / 93.1 / 98.1 |
-| DAGM | 91.8 / 75.8 / 79.5 | 94.4 / 80.3 / 83.9 | 98.0 / 90.6 / 92.4 | 98.3 / 91.5 / 94.2 | **99.5 / 95.0 / 97.8** | 93.2 / 83.9 / 86.1 |
-| DTD-Synthetic | 95.1 / 94.1 / 97.7 | 85.5 / 89.1 / 94.0 | 93.7 / 94.3 / 97.4 | 92.1 / 92.4 / 96.3 | **97.5 / 96.6 / 99.1** | 91.0 / 94.4 / 97.4 |
-
-### Pixel-Level ZSAD Performance (AUROC / F1-max / AP / PRO)
-
-| Dataset | WinCLIP | APRIL-GAN | AnomalyCLIP | AdaCLIP | **VisualAD (CLIP)** | **VisualAD (DINOv2)** |
-|:--|:--:|:--:|:--:|:--:|:--:|:--:|
-| MVTec-AD | 82.3 / 24.8 / 18.2 / 62.0 | 87.5 / 42.3 / 39.1 / 43.7 | 91.0 / 38.9 / 34.4 / 81.7 | 88.5 / 43.9 / 41.0 / 47.6 | 90.8 / 43.9 / 41.2 / 87.5 | **91.3 / 47.4 / 45.4 / 88.6** |
-| VisA | 73.2 / 9.0 / 5.4 / 51.1 | 93.8 / 32.6 / 26.2 / 86.5 | 95.4 / 27.6 / 20.7 / 86.4 | 95.1 / 33.8 / 29.2 / 71.3 | **95.8 / 34.6 / 28.4 / 91.0** | 95.3 / 35.2 / 29.9 / 88.2 |
-| BTAD | 72.7 / 18.5 / 12.9 / 27.3 | 91.3 / 40.1 / 37.7 / 21.0 | 93.0 / 47.1 / 41.5 / 71.0 | 87.7 / 42.3 / 36.6 / 17.1 | 91.1 / **49.8** / **43.1** / **80.4** | **93.4** / 42.6 / 38.7 / 76.7 |
-| DTD-Synthetic | 79.5 / 16.1 / 9.8 / 51.5 | 94.9 / 60.4 / 61.0 / 33.8 | 97.5 / 55.8 / 52.5 / 87.9 | 95.1 / 58.4 / 56.1 / 34.3 | **98.1** / 64.3 / 65.5 / **94.8** | 96.7 / **65.8** / **67.7** / 92.4 |
-
-> All backbones use ViT-L/14@336px (CLIP) or ViT-L/14 (DINOv2). Full results including medical benchmarks (OCT17, BrainMRI, Brain_AD, HIS, CVC-ClinicDB, Endo, Kvasir) are available in our paper.
-
-## Getting Started
-
-### 1. Environment
+## 1. 环境安装
 
 ```bash
+cd <PROJECT_ROOT>
 pip install -r requirements.txt
 ```
 
-Main dependencies: PyTorch >= 2.0, torchvision, timm, scikit-learn, scipy, tqdm.
+---
 
-### 2. Data Preparation
+## 2. 数据准备
 
-We adopt the same dataset structure and JSON format as [AnomalyCLIP](https://github.com/zqhang/AnomalyCLIP). Please refer to their repository for dataset download and organization details.
+项目使用与 AnomalyCLIP 一致的数据组织方式，需要在数据根目录下准备 `meta.json`。
 
-We also provide scripts to generate the required JSON metadata files:
+可使用仓库内脚本生成数据集 JSON（示例）：
 
 ```bash
 python generate_dataset_json/mvtec.py
 python generate_dataset_json/visa.py
 ```
 
-Supported datasets: MVTec-AD, VisA, BTAD, KSDD2, DAGM, DTD-Synthetic, OCT17, BrainMRI, Brain_AD, HIS, CVC-ClinicDB, Endo, Kvasir.
+---
 
-### 3. Pre-trained Weights
+## 3. VisualAD 原始流程使用方法
 
-We provide pre-trained checkpoints with the CLIP (ViT-L/14@336px) backbone:
-
-| Training Set | Checkpoint | Evaluation Set |
-|:--|:--|:--|
-| VisA | `weight/train_on_visa/CLIP.pth` | MVTec-AD and other cross-dataset benchmarks |
-| MVTec-AD | `weight/train_on_mvtec/CLIP.pth` | VisA |
-
-### 4. Quick Start
-
-Run the full cross-dataset training and evaluation pipeline (MVTec-AD <-> VisA) with a single command:
+### 3.1 一键跨数据集训练+测试
 
 ```bash
 bash scripts/CLIP.sh
 ```
 
-Please modify the dataset paths in `scripts/CLIP.sh` before running.
+运行前请先修改脚本内数据路径：
+- `MVTEC_PATH`
+- `VISA_PATH`
 
-## Phase 1 (timm Student Bootstrap)
-
-To start the lightweight timm-based student project files without changing VisualAD core model files:
+### 3.2 单独训练
 
 ```bash
-python train_timm_student.py --config configs/default.yaml
+python train.py \
+  --train_data_path <YOUR_DATASET_ROOT> \
+  --save_path ./checkpoints \
+  --train_dataset mvtec \
+  --backbone "ViT-L/14@336px" \
+  --epoch 15 \
+  --batch_size 8 \
+  --device cuda:0
 ```
 
-Dataset-specific startup scripts:
+### 3.3 单独测试
+
+```bash
+python test.py \
+  --test_data_path <YOUR_DATASET_ROOT> \
+  --checkpoint_path ./checkpoints/final_model.pth \
+  --test_dataset mvtec \
+  --save_path ./test_results \
+  --device cuda:0
+```
+
+---
+
+## 4. Phase 1 (timm student) 使用方法
+
+### 4.1 配置方式启动
+
+```bash
+python train_timm_student.py \
+  --config configs/default.yaml
+```
+
+### 4.2 数据集脚本启动
 
 ```bash
 bash scripts/run_timm_mvtec.sh
 bash scripts/run_timm_visa.sh
 ```
 
-Before running, replace dataset placeholders (for example `<REPLACE_WITH_YOUR_MVTEC_PATH>`, `<REPLACE_WITH_YOUR_VISA_PATH>`) in
-`configs/default.yaml` and the corresponding script with your real local dataset paths.
+运行前需要替换占位路径：
+- `"<REPLACE_WITH_YOUR_MVTEC_PATH>"`
+- `"<REPLACE_WITH_YOUR_VISA_PATH>"`
 
-In these scripts, `fasternet_t0` is forced to `feature_out_indices=[0, 1, 2, 3]`.
-Other student backbones keep the default `feature_out_indices` unchanged.
+脚本已内置约束：
+- `fasternet_t0` 固定使用 `feature_out_indices=[0,1,2,3]`
+- 其他学生骨干默认使用 `feature_out_indices=[1,2,3,4]`
 
-## Citation
+---
 
-If you find this work useful, please consider citing:
+## 5. requirements 兼容性检查结论
 
-```bibtex
-@article{hou2026visualad,
-  title={VisualAD: Language-Free Zero-Shot Anomaly Detection via Vision Transformer},
-  author={Hou, Yanning and Li, Peiyuan and Liu, Zirui and Wang, Yitong and Ruan, Yanran and Qiu, Jianfeng and Xu, Ke},
-  journal={arXiv preprint arXiv:2603.07952},
-  year={2026}
-}
-```
+已对 **VisualAD 现有依赖** 与 **新增 timm student 流程依赖** 做合并校验，结论如下：
 
-## Acknowledgements
+1. 主干深度学习栈兼容：
+   - `torch==2.0.0`
+   - `torchvision==0.15.1`
+   - `timm==0.6.13`
+2. 数值与评估栈兼容：
+   - `numpy==1.24.4` 与 `scipy==1.9.1`、`scikit-learn==1.2.2`、`scikit-image==0.20.0` 可配套使用
+3. 已补齐代码中实际使用但原文件缺失的依赖：
+   - `pillow`、`pandas`、`matplotlib`、`opencv-python`、`tabulate`、`ftfy`、`regex`
+4. 保留了原有依赖项：
+   - `seaborn`、`tqdm`、`PyYAML`、`torchsummary`、`dash-table`
 
-This project builds upon [CLIP](https://github.com/openai/CLIP) and [DINOv2](https://github.com/facebookresearch/dinov2). We thank the authors of [AnomalyCLIP](https://github.com/zqhang/AnomalyCLIP) and [AdaCLIP](https://github.com/caoyunkang/AdaCLIP) for their open-source implementations.
+统一依赖清单见：
+- `requirements.txt`
+
+---
+
+## 6. 目录重点
+
+- VisualAD 原模型实现：`VisualAD_lib/`
+- 原始训练测试入口：`train.py`、`test.py`
+- Phase 1 入口：`train_timm_student.py`
+- 统一依赖：`requirements.txt`

@@ -36,7 +36,9 @@ def load_config(config_path: Path) -> Dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser("Timm Student bootstrap (Phase 1)")
+    parser = argparse.ArgumentParser(
+        "Train a lightweight timm student backbone for Phase 1 bootstrap"
+    )
     parser.add_argument("--config", type=str, default="configs/default.yaml")
     parser.add_argument("--student_backbone", type=str, default=None)
     parser.add_argument("--feature_out_indices", type=str, default=None)

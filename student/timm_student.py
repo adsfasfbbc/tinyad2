@@ -43,6 +43,7 @@ class TimmStudent(nn.Module):
 
         self.align_layers = nn.ModuleList(
             [
+                # Bias is disabled since this layer is used for channel projection/alignment only.
                 nn.Conv2d(in_channels=s_c, out_channels=t_c, kernel_size=1, bias=False)
                 for s_c, t_c in zip(self._student_channels, self.teacher_channels)
             ]
