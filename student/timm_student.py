@@ -29,22 +29,22 @@ class TimmStudent(nn.Module):
             out_indices=tuple(self.feature_out_indices),
         )
 
-        self.student_channels: List[int] = list(self.backbone.feature_info.channels())
+        self._student_channels: List[int] = list(self.backbone.feature_info.channels())
         if teacher_channels is None:
-            self.teacher_channels = list(self.student_channels)
+            self.teacher_channels = list(self._student_channels)
         else:
             self.teacher_channels = [int(c) for c in teacher_channels]
 
-        if len(self.teacher_channels) != len(self.student_channels):
+        if len(self.teacher_channels) != len(self._student_channels):
             raise ValueError(
                 "teacher_channels length must match number of extracted student feature maps: "
-                f"{len(self.teacher_channels)} vs {len(self.student_channels)}"
+                f"{len(self.teacher_channels)} vs {len(self._student_channels)}"
             )
 
         self.align_layers = nn.ModuleList(
             [
                 nn.Conv2d(in_channels=s_c, out_channels=t_c, kernel_size=1, bias=False)
-                for s_c, t_c in zip(self.student_channels, self.teacher_channels)
+                for s_c, t_c in zip(self._student_channels, self.teacher_channels)
             ]
         )
 
@@ -61,4 +61,4 @@ class TimmStudent(nn.Module):
 
     @property
     def output_channels(self) -> List[int]:
-        return list(self.student_channels)
+        return list(self._student_channels)

@@ -91,15 +91,18 @@ Please modify the dataset paths in `scripts/CLIP.sh` before running.
 To start the lightweight timm-based student project files without changing VisualAD core model files:
 
 ```bash
-python train_timm_student.py --config /home/runner/work/tinyad2/tinyad2/configs/default.yaml
+python train_timm_student.py --config configs/default.yaml
 ```
 
 Dataset-specific startup scripts:
 
 ```bash
-bash /home/runner/work/tinyad2/tinyad2/scripts/run_timm_mvtec.sh
-bash /home/runner/work/tinyad2/tinyad2/scripts/run_timm_visa.sh
+bash scripts/run_timm_mvtec.sh
+bash scripts/run_timm_visa.sh
 ```
+
+Before running, replace dataset placeholders (for example `<REPLACE_WITH_YOUR_MVTEC_PATH>`, `<REPLACE_WITH_YOUR_VISA_PATH>`) in
+`configs/default.yaml` and the corresponding script with your real local dataset paths.
 
 In these scripts, `fasternet_t0` is forced to `feature_out_indices=[0, 1, 2, 3]`.
 Other student backbones keep the default `feature_out_indices` unchanged.

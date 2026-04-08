@@ -19,9 +19,11 @@ SUPPORTED_STUDENTS = {
     "mobilevit_s",
     "fasternet_t0",
 }
+DEFAULT_FEATURE_OUT_INDICES = [1, 2, 3, 4]
+DEFAULT_TEACHER_CHANNELS = [256, 512, 1024, 2048]
 
 
-def parse_indices(raw: str) -> List[int]:
+def parse_int_list(raw: str) -> List[int]:
     values = ast.literal_eval(raw)
     if not isinstance(values, (list, tuple)):
         raise ValueError("feature_out_indices must be a list/tuple")
@@ -35,7 +37,7 @@ def load_config(config_path: Path) -> Dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser("Timm Student bootstrap (Phase 1)")
-    parser.add_argument("--config", type=str, default="/home/runner/work/tinyad2/tinyad2/configs/default.yaml")
+    parser.add_argument("--config", type=str, default="configs/default.yaml")
     parser.add_argument("--student_backbone", type=str, default=None)
     parser.add_argument("--feature_out_indices", type=str, default=None)
     parser.add_argument("--teacher_channels", type=str, default=None)
@@ -53,14 +55,14 @@ def main() -> None:
 
     student_backbone = args.student_backbone or cfg.get("student_backbone", "mobilenetv3_small_100")
     feature_out_indices = (
-        parse_indices(args.feature_out_indices)
+        parse_int_list(args.feature_out_indices)
         if args.feature_out_indices is not None
-        else list(cfg.get("feature_out_indices", [1, 2, 3, 4]))
+        else list(cfg.get("feature_out_indices", DEFAULT_FEATURE_OUT_INDICES))
     )
     teacher_channels = (
-        parse_indices(args.teacher_channels)
+        parse_int_list(args.teacher_channels)
         if args.teacher_channels is not None
-        else list(cfg.get("teacher_channels", [256, 512, 1024, 2048]))
+        else list(cfg.get("teacher_channels", DEFAULT_TEACHER_CHANNELS))
     )
     image_size = args.image_size or int(cfg.get("image_size", 256))
     save_path = args.save_path or cfg.get("save_path", "./experiments/timm_distill")
