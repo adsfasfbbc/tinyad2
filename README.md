@@ -86,6 +86,24 @@ bash scripts/CLIP.sh
 
 Please modify the dataset paths in `scripts/CLIP.sh` before running.
 
+## Phase 1 (timm Student Bootstrap)
+
+To start the lightweight timm-based student project files without changing VisualAD core model files:
+
+```bash
+python train_timm_student.py --config /home/runner/work/tinyad2/tinyad2/configs/default.yaml
+```
+
+Dataset-specific startup scripts:
+
+```bash
+bash /home/runner/work/tinyad2/tinyad2/scripts/run_timm_mvtec.sh
+bash /home/runner/work/tinyad2/tinyad2/scripts/run_timm_visa.sh
+```
+
+In these scripts, `fasternet_t0` is forced to `feature_out_indices=[0, 1, 2, 3]`.
+Other student backbones keep the default `feature_out_indices` unchanged.
+
 ## Citation
 
 If you find this work useful, please consider citing:

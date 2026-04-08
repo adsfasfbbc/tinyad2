@@ -1,0 +1,10 @@
+teacher_backbone: wide_resnet50_2
+student_backbone: mobilenetv3_small_100
+feature_out_indices: [1, 2, 3, 4]
+teacher_channels: [256, 512, 1024, 2048]
+pretrained: true
+image_size: 256
+batch_size: 8
+dataset: mvtec
+train_data_path: /path/to/mvtec
+save_path: ./experiments/timm_distill
