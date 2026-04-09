@@ -46,8 +46,12 @@ class CutPasteSynthesizer(BaseAnomalySynthesizer):
             if torch.rand(1, device=images.device).item() > self.anomaly_prob:
                 continue
 
-            patch_h = int(torch.randint(max(4, int(h * self.min_patch_ratio)), max(5, int(h * self.max_patch_ratio)) + 1, (1,), device=images.device).item())
-            patch_w = int(torch.randint(max(4, int(w * self.min_patch_ratio)), max(5, int(w * self.max_patch_ratio)) + 1, (1,), device=images.device).item())
+            min_h = max(4, int(h * self.min_patch_ratio))
+            max_h = max(5, int(h * self.max_patch_ratio))
+            min_w = max(4, int(w * self.min_patch_ratio))
+            max_w = max(5, int(w * self.max_patch_ratio))
+            patch_h = int(torch.randint(min_h, max_h + 1, (1,), device=images.device).item())
+            patch_w = int(torch.randint(min_w, max_w + 1, (1,), device=images.device).item())
             patch_h = min(patch_h, h - 1)
             patch_w = min(patch_w, w - 1)
 
@@ -71,6 +75,7 @@ def _perlin_noise_2d(height: int, width: int, res_h: int, res_w: int, device: to
     res_h = max(1, int(res_h))
     res_w = max(1, int(res_w))
 
+    # Subtract epsilon from the endpoint to avoid indexing gradients at the closed upper boundary.
     yy = torch.linspace(0.0, float(res_h) - 1e-6, steps=height, device=device, dtype=dtype)
     xx = torch.linspace(0.0, float(res_w) - 1e-6, steps=width, device=device, dtype=dtype)
     grid_y, grid_x = torch.meshgrid(yy, xx, indexing="ij")

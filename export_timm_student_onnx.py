@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import torch
 
@@ -14,7 +14,7 @@ class StudentOnnxWrapper(torch.nn.Module):
         super().__init__()
         self.student = student
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         aligned = self.student(x)["aligned_features"]
         return tuple(aligned)
 

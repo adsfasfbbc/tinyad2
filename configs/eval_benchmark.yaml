@@ -17,7 +17,7 @@ models:
   - name: VisualAD-Teacher
     type: visualad_teacher
     backbone: "ViT-L/14@336px"
-    checkpoint: "<REPLACE_WITH_YOUR_VISUALAD_TEACHER_CHECKPOINT_PTH>"
+    checkpoint: "<REPLACE_WITH_YOUR_VISUALAD_TEACHER_CHECKPOINT_PATH>"
     onnx_path: "<OPTIONAL_VISUALAD_TEACHER_ONNX_PATH>"
 
   - name: MobileNetV3-Small
@@ -26,7 +26,7 @@ models:
     teacher_backbone: wide_resnet50_2
     feature_out_indices: [1, 2, 3, 4]
     teacher_channels: [256, 512, 1024, 2048]
-    checkpoint: "<REPLACE_WITH_MOBILENET_STUDENT_CHECKPOINT_PTH>"
+    checkpoint: "<REPLACE_WITH_MOBILENET_STUDENT_CHECKPOINT_PATH>"
     onnx_path: "<OPTIONAL_MOBILENET_STUDENT_ONNX_PATH>"
 
   - name: GhostNet
@@ -35,7 +35,7 @@ models:
     teacher_backbone: wide_resnet50_2
     feature_out_indices: [1, 2, 3, 4]
     teacher_channels: [256, 512, 1024, 2048]
-    checkpoint: "<REPLACE_WITH_GHOSTNET_STUDENT_CHECKPOINT_PTH>"
+    checkpoint: "<REPLACE_WITH_GHOSTNET_STUDENT_CHECKPOINT_PATH>"
     onnx_path: "<OPTIONAL_GHOSTNET_STUDENT_ONNX_PATH>"
 
   - name: RepVGG-A0
@@ -44,7 +44,7 @@ models:
     teacher_backbone: wide_resnet50_2
     feature_out_indices: [1, 2, 3, 4]
     teacher_channels: [256, 512, 1024, 2048]
-    checkpoint: "<REPLACE_WITH_REPVGG_A0_STUDENT_CHECKPOINT_PTH>"
+    checkpoint: "<REPLACE_WITH_REPVGG_A0_STUDENT_CHECKPOINT_PATH>"
     onnx_path: "<OPTIONAL_REPVGG_A0_STUDENT_ONNX_PATH>"
 
   - name: RepVGG-A1
@@ -53,7 +53,7 @@ models:
     teacher_backbone: wide_resnet50_2
     feature_out_indices: [1, 2, 3, 4]
     teacher_channels: [256, 512, 1024, 2048]
-    checkpoint: "<REPLACE_WITH_REPVGG_A1_STUDENT_CHECKPOINT_PTH>"
+    checkpoint: "<REPLACE_WITH_REPVGG_A1_STUDENT_CHECKPOINT_PATH>"
     onnx_path: "<OPTIONAL_REPVGG_A1_STUDENT_ONNX_PATH>"
 
   - name: MobileViT-S
@@ -62,5 +62,5 @@ models:
     teacher_backbone: wide_resnet50_2
     feature_out_indices: [1, 2, 3, 4]
     teacher_channels: [256, 512, 1024, 2048]
-    checkpoint: "<REPLACE_WITH_MOBILEVIT_S_STUDENT_CHECKPOINT_PTH>"
+    checkpoint: "<REPLACE_WITH_MOBILEVIT_S_STUDENT_CHECKPOINT_PATH>"
     onnx_path: "<OPTIONAL_MOBILEVIT_S_STUDENT_ONNX_PATH>"

@@ -73,7 +73,7 @@ def _estimate_flops_conv_linear(model: torch.nn.Module, input_tensor: torch.Tens
         nonlocal total_flops
         in_features = mod.in_features
         out_features = mod.out_features
-        batch = int(np.prod(inp[0].shape[:-1])) if inp and inp[0].dim() > 1 else inp[0].shape[0]
+        batch = int(np.prod(inp[0].shape[:-1])) if inp and inp[0].dim() > 1 else (inp[0].shape[0] if inp else 1)
         total_flops += float(batch * in_features * out_features * 2.0)
 
     for module in model.modules():

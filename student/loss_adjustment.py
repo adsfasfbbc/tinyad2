@@ -45,9 +45,11 @@ class WarmupAnomalyLossAdjuster(BaseLossAdjuster):
         self.clean_weight = float(clean_weight)
         self.anomaly_start_weight = float(anomaly_start_weight)
         self.anomaly_target_weight = float(anomaly_target_weight)
-        self.warmup_epochs = max(1, int(warmup_epochs))
+        self.warmup_epochs = max(0, int(warmup_epochs))
 
     def _anomaly_weight(self, epoch: int) -> float:
+        if self.warmup_epochs == 0:
+            return self.anomaly_target_weight
         ratio = min(1.0, max(0.0, float(epoch) / float(self.warmup_epochs)))
         return self.anomaly_start_weight + ratio * (self.anomaly_target_weight - self.anomaly_start_weight)
 
