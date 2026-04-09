@@ -140,3 +140,53 @@ python train_timm_student.py \
 - 原始训练测试入口：`train.py`、`test.py`
 - Phase 1 入口：`train_timm_student.py`
 - 统一依赖：`requirements.txt`
+
+---
+
+## 7. 统一测试评估与论文表格产出（MVTec + VisA）
+
+### 7.1 先导出学生 ONNX（可选）
+
+```bash
+bash scripts/export_students_onnx.sh
+```
+
+或按单模型导出：
+
+```bash
+python export_timm_student_onnx.py \
+  --checkpoint_path <STUDENT_CHECKPOINT_PTH> \
+  --student_backbone mobilenetv3_small_100 \
+  --output_path ./experiments/onnx_exports/mobilenetv3_small_100.onnx
+```
+
+### 7.2 配置统一评测
+
+编辑：
+- `configs/eval_benchmark.yaml`
+
+需要填写：
+- MVTec/VisA 数据集路径
+- 教师模型（VisualAD）checkpoint 路径
+- 5 个学生模型 checkpoint 路径
+- 可选 ONNX 路径（用于同时展示 pth/onnx 参数量）
+
+### 7.3 一键评测并产出核心对比表
+
+```bash
+bash scripts/run_unified_eval.sh
+```
+
+输出目录（默认）：
+- `experiments/eval_benchmark/core_table.md`
+- `experiments/eval_benchmark/core_table.csv`
+- `experiments/eval_benchmark/per_dataset_metrics.csv`
+
+核心表格列为：
+
+`Model | Params (M) | FLOPs (G) | FPS | Image-AUROC | Pixel-AUROC | MAP | F1-SCORE`
+
+说明：
+- `Image-AUROC / Pixel-AUROC`：跨 MVTec 与 VisA 的均值
+- `MAP / F1-SCORE`：默认使用 **Image-level** mAP / F1
+- `per_dataset_metrics.csv` 同时保留每个数据集的 image/pixel 明细指标
