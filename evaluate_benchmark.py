@@ -69,11 +69,19 @@ def _estimate_flops_conv_linear(model: torch.nn.Module, input_tensor: torch.Tens
         kernel_ops = mod.kernel_size[0] * mod.kernel_size[1] * (mod.in_channels / mod.groups)
         total_flops += float(out.shape[0] * out_h * out_w * mod.out_channels * kernel_ops * 2.0)
 
+    def _infer_linear_batch(inp: Tuple[torch.Tensor]) -> int:
+        if not inp:
+            return 1
+        x = inp[0]
+        if x.dim() > 1:
+            return int(np.prod(x.shape[:-1]))
+        return int(x.shape[0])
+
     def linear_hook(mod: torch.nn.Linear, inp: Tuple[torch.Tensor], out: torch.Tensor) -> None:
         nonlocal total_flops
         in_features = mod.in_features
         out_features = mod.out_features
-        batch = int(np.prod(inp[0].shape[:-1])) if inp and inp[0].dim() > 1 else (inp[0].shape[0] if inp else 1)
+        batch = _infer_linear_batch(inp)
         total_flops += float(batch * in_features * out_features * 2.0)
 
     for module in model.modules():
@@ -319,17 +327,19 @@ def _evaluate_single_dataset(
 
 def _measure_fps(adapter: BaseAdapter, image_size: int, device: torch.device, warmup: int, iters: int) -> float:
     dummy = torch.randn(1, 3, image_size, image_size, device=device)
-    for _ in range(max(0, warmup)):
+    warmup = max(0, int(warmup))
+    iters = max(1, int(iters))
+    for _ in range(warmup):
         _ = adapter.predict_map(dummy, image_size=image_size)
     if device.type == "cuda":
         torch.cuda.synchronize()
     start = time.perf_counter()
-    for _ in range(max(1, iters)):
+    for _ in range(iters):
         _ = adapter.predict_map(dummy, image_size=image_size)
     if device.type == "cuda":
         torch.cuda.synchronize()
     elapsed = time.perf_counter() - start
-    return float(max(1, iters) / max(elapsed, 1e-8))
+    return float(iters / max(elapsed, 1e-8))
 
 
 def _format_pct(v: float) -> str:

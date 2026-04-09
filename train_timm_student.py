@@ -166,6 +166,8 @@ def main() -> None:
         raise ValueError(f"Unsupported student_backbone: {student_backbone}")
     if student_backbone == "fasternet_t0" and feature_out_indices != [0, 1, 2, 3]:
         raise ValueError("fasternet_t0 only supports feature_out_indices=[0, 1, 2, 3] in this project setup")
+    if epochs <= 0:
+        raise ValueError(f"epochs must be > 0, got {epochs}")
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     Path(save_path).mkdir(parents=True, exist_ok=True)

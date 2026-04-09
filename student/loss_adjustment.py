@@ -75,7 +75,12 @@ def build_loss_adjuster(name: str, config: Dict[str, float] | None = None) -> Ba
     cfg = config or {}
     normalized = (name or "fixed").strip().lower()
     if normalized == "fixed":
-        return FixedLossAdjuster(weights=cfg.get("weights", {}))
+        weights = cfg.get("weights", {})
+        if weights is None:
+            weights = {}
+        if not isinstance(weights, dict):
+            raise ValueError(f"loss_adjuster_config.weights must be a dict, got {type(weights).__name__}")
+        return FixedLossAdjuster(weights=weights)
     if normalized in {"warmup", "curriculum"}:
         return WarmupAnomalyLossAdjuster(
             clean_weight=float(cfg.get("clean_weight", 1.0)),
