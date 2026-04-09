@@ -1,0 +1,42 @@
+runtime:
+  seed: 111
+  device: cuda:0
+  image_size: 256
+  batch_size: 8
+  epochs: 20
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  num_workers: 4
+  save_freq: 5
+  log_freq: 20
+  save_path: ./experiments/vit_mobilevit_distill
+
+model:
+  teacher_backbone: ViT-L/14@336px
+  teacher_layers: [6, 12, 18, 24]
+  student_backbone: mobilevit_s
+  student_out_indices: [1, 2, 3, 4]
+  projector_hidden_dim: 1024
+  projector_dropout: 0.1
+  pretrained: true
+
+data:
+  dataset_name: mvtec
+  train_data_path: "<REPLACE_WITH_YOUR_MVTEC_PATH>"
+  online_anomaly_prob: 0.7
+  anomaly_generator:
+    mode: perlin # perlin / cutpaste
+    perlin_scale_min: 2
+    perlin_scale_max: 6
+    threshold_min: 0.60
+    threshold_max: 0.75
+    blend_alpha: 0.5
+    min_patch_ratio: 0.08
+    max_patch_ratio: 0.30
+
+loss:
+  token_margin: 0.5
+  attention_temperature: 0.07
+  weight_token: 1.0
+  weight_attention: 1.0
+  weight_cls: 0.5

@@ -190,3 +190,33 @@ bash scripts/run_unified_eval.sh
 - `Image-AUROC / Pixel-AUROC`：跨 MVTec 与 VisA 的均值
 - `MAP / F1-SCORE`：默认使用 **Image-level** mAP / F1
 - `per_dataset_metrics.csv` 同时保留每个数据集的 image/pixel 明细指标
+
+---
+
+## 8. ViT→MobileViT 异构蒸馏（架构升级版）
+
+新增训练入口：
+- `train_vit_mobilevit_distill.py`
+
+新增模块：
+- `student/mobilevit_token_student.py`：MobileViT Token 提取 + MLP Projector 对齐
+- `utils/vit_teacher_adapter.py`：VisualAD ViT Teacher 冻结适配
+- `distill/losses.py`：
+  - `TokenContrastiveLoss`（正常拉近、异常排斥）
+  - `AttentionMimicryLoss`（Attention Proxy KL 对齐）
+  - `CLSTokenAlignmentLoss`（全局语义对齐）
+- `utils/anomaly_generator.py`：Perlin/CutPaste 在线异常生成
+
+配置与脚本：
+- `configs/vit_mobilevit_distill.yaml`
+- `scripts/run_vit_mobilevit_distill.sh`
+
+运行：
+
+```bash
+bash scripts/run_vit_mobilevit_distill.sh
+```
+
+说明：
+- `Dataset.__getitem__` 在训练模式下支持在线异常合成，返回增强图像、mask 与标签。
+- 教师为 VisualAD ViT（冻结），学生为 MobileViT（可训练），通过 MLP 将学生 token 映射到教师 token 维度后执行三重蒸馏损失。

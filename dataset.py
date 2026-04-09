@@ -39,10 +39,22 @@ def generate_class_info(dataset_name):
     return obj_list, class_name_map_class_id
 
 class Dataset(data.Dataset):
-    def __init__(self, root, transform, target_transform, dataset_name, mode='test'):
+    def __init__(
+        self,
+        root,
+        transform,
+        target_transform,
+        dataset_name,
+        mode='test',
+        anomaly_generator=None,
+        online_anomaly_prob=0.0,
+    ):
         self.root = root
         self.transform = transform
         self.target_transform = target_transform
+        self.mode = mode
+        self.anomaly_generator = anomaly_generator
+        self.online_anomaly_prob = float(max(0.0, min(1.0, online_anomaly_prob)))
         self.data_all = []
         meta_info = json.load(open(f'{self.root}/meta.json', 'r'))
         name = self.root.split('/')[-1]
@@ -76,6 +88,18 @@ class Dataset(data.Dataset):
         img_mask = self.target_transform(   
             img_mask) if self.target_transform is not None and img_mask is not None else img_mask
         img_mask = [] if img_mask is None else img_mask
+
+        if (
+            self.mode == 'train'
+            and self.anomaly_generator is not None
+            and random.random() < self.online_anomaly_prob
+            and isinstance(img, torch.Tensor)
+        ):
+            gen_img, gen_mask, gen_label = self.anomaly_generator(img)
+            img = gen_img
+            img_mask = gen_mask
+            anomaly = int(gen_label)
+
         # Handle unknown class names by assigning a default ID
         cls_id = self.class_name_map_class_id.get(cls_name, 0)
         return {'img': img, 'img_mask': img_mask, 'cls_name': cls_name, 'anomaly': anomaly,
