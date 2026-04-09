@@ -5,7 +5,34 @@ teacher_channels: [256, 512, 1024, 2048]
 pretrained: true
 image_size: 256
 batch_size: 8
+epochs: 20
+learning_rate: 0.0001
+weight_decay: 0.0001
+num_workers: 4
+save_freq: 5
+log_freq: 20
+seed: 111
 dataset: mvtec
 # Replace with your actual dataset root path before running scripts.
 train_data_path: "<REPLACE_WITH_YOUR_MVTEC_PATH>"
 save_path: ./experiments/timm_distill
+anomaly_synthesizer: cutpaste  # options: none, cutpaste, perlin
+anomaly_synthesizer_config:
+  anomaly_prob: 1.0
+  min_patch_ratio: 0.08
+  max_patch_ratio: 0.30
+  perlin_scale_min: 2
+  perlin_scale_max: 6
+  threshold_min: 0.60
+  threshold_max: 0.75
+  blend_alpha: 0.5
+loss_adjuster: fixed  # options: fixed, warmup
+loss_adjuster_config:
+  weights:
+    clean_distill: 1.0
+    anomaly_distill: 1.0
+  clean_weight: 1.0
+  anomaly_start_weight: 0.1
+  anomaly_target_weight: 1.0
+  warmup_epochs: 5
+anomaly_region_weight: 4.0

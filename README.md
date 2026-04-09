@@ -68,14 +68,18 @@ python test.py \
 
 ---
 
-## 4. Phase 1 (timm student) 使用方法
+## 4. Phase 1 (timm student) 正式蒸馏训练使用方法
 
-### 4.1 配置方式启动
+### 4.1 配置方式启动（正式训练）
 
 ```bash
 python train_timm_student.py \
   --config configs/default.yaml
 ```
+
+默认会执行 teacher-student feature distillation，并启用可插拔模块：
+- 异常合成模块（`anomaly_synthesizer`）：`none` / `cutpaste` / `perlin`
+- 损失调整模块（`loss_adjuster`）：`fixed` / `warmup`
 
 ### 4.2 数据集脚本启动
 
@@ -91,6 +95,22 @@ bash scripts/run_timm_visa.sh
 脚本已内置约束：
 - `fasternet_t0` 固定使用 `feature_out_indices=[0,1,2,3]`
 - 其他学生骨干默认使用 `feature_out_indices=[1,2,3,4]`
+
+### 4.3 消融实验常用参数示例
+
+```bash
+# 使用 CutPaste + 固定权重
+python train_timm_student.py \
+  --config configs/default.yaml \
+  --anomaly_synthesizer cutpaste \
+  --loss_adjuster fixed
+
+# 使用 Perlin Noise + warmup 权重
+python train_timm_student.py \
+  --config configs/default.yaml \
+  --anomaly_synthesizer perlin \
+  --loss_adjuster warmup
+```
 
 ---
 
