@@ -75,7 +75,7 @@ def _perlin_noise_2d(height: int, width: int, res_h: int, res_w: int, device: to
     res_h = max(1, int(res_h))
     res_w = max(1, int(res_w))
 
-    # Keep max value strictly below res_{h,w}; otherwise floor()==res and y1/x1 would overflow gradient grid.
+    # Keep max value strictly below res_{h,w}; otherwise floor()==res and y1=y0+1 / x1=x0+1 overflow gradient grid.
     yy = torch.linspace(0.0, float(res_h) - 1e-6, steps=height, device=device, dtype=dtype)
     xx = torch.linspace(0.0, float(res_w) - 1e-6, steps=width, device=device, dtype=dtype)
     grid_y, grid_x = torch.meshgrid(yy, xx, indexing="ij")

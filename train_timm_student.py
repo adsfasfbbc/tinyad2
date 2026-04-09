@@ -204,7 +204,7 @@ def main() -> None:
     )
 
     optimizer = torch.optim.AdamW(student.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, epochs))
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
     anomaly_synthesizer = build_anomaly_synthesizer(anomaly_synthesizer_name, anomaly_synth_cfg)
     loss_adjuster = build_loss_adjuster(loss_adjuster_name, loss_adjuster_cfg)

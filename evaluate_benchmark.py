@@ -327,8 +327,6 @@ def _evaluate_single_dataset(
 
 def _measure_fps(adapter: BaseAdapter, image_size: int, device: torch.device, warmup: int, iters: int) -> float:
     dummy = torch.randn(1, 3, image_size, image_size, device=device)
-    warmup = max(0, int(warmup))
-    iters = max(1, int(iters))
     for _ in range(warmup):
         _ = adapter.predict_map(dummy, image_size=image_size)
     if device.type == "cuda":
@@ -403,6 +401,10 @@ def main() -> None:
     sigma = int(runtime.get("sigma", 4))
     warmup = int(runtime.get("fps_warmup", 10))
     fps_iters = int(runtime.get("fps_iters", 50))
+    if warmup < 0:
+        raise ValueError(f"runtime.fps_warmup must be >= 0, got {warmup}")
+    if fps_iters <= 0:
+        raise ValueError(f"runtime.fps_iters must be > 0, got {fps_iters}")
     device = torch.device(runtime.get("device", "cuda:0") if torch.cuda.is_available() else "cpu")
 
     datasets = cfg.get("datasets", [])
@@ -423,6 +425,8 @@ def main() -> None:
         params_m = _count_params(adapter.stat_module())
         dummy = torch.randn(1, 3, image_size, image_size, device=device)
         flops_g = _estimate_flops_conv_linear(adapter.stat_module(), dummy)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
         fps = _measure_fps(adapter, image_size=image_size, device=device, warmup=warmup, iters=fps_iters)
 
         onnx_path = model_cfg.get("onnx_path")
