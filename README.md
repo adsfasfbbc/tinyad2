@@ -238,7 +238,7 @@ bash scripts/run_vit_mobilevit_distill.sh
   - `dispatcher.py`（策略 A/B/C）
 - `benchmark_ad/configs/`
   - `tinyvit_distill.yaml`
-  - `mobilvit_distill.yaml`
+  - `mobilevit_distill.yaml`
   - `fastvit_distill.yaml`
   - `mobilenetv4_distill.yaml`
   - `unireplknet_distill.yaml`
