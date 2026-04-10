@@ -71,12 +71,16 @@ class HybridSyntheticAnomaly:
         mask = torch.zeros((1, h, w), device=image.device, dtype=image.dtype)
         ph = random.randint(max(4, int(h * self.min_patch_ratio)), max(5, int(h * self.max_patch_ratio)))
         pw = random.randint(max(4, int(w * self.min_patch_ratio)), max(5, int(w * self.max_patch_ratio)))
-        ph = min(ph, h - 1)
-        pw = min(pw, w - 1)
-        sy = random.randint(0, h - ph - 1)
-        sx = random.randint(0, w - pw - 1)
-        dy = random.randint(0, h - ph - 1)
-        dx = random.randint(0, w - pw - 1)
+        ph = max(1, min(ph, h - 1))
+        pw = max(1, min(pw, w - 1))
+        max_sy = max(0, h - ph)
+        max_sx = max(0, w - pw)
+        max_dy = max(0, h - ph)
+        max_dx = max(0, w - pw)
+        sy = random.randint(0, max_sy) if max_sy > 0 else 0
+        sx = random.randint(0, max_sx) if max_sx > 0 else 0
+        dy = random.randint(0, max_dy) if max_dy > 0 else 0
+        dx = random.randint(0, max_dx) if max_dx > 0 else 0
         patch = image[:, sy : sy + ph, sx : sx + pw]
         if random.random() < 0.5:
             patch = torch.flip(patch, dims=[-1])
@@ -114,4 +118,3 @@ class HybridSyntheticAnomaly:
         else:
             out, mask = self._cutpaste(image)
         return out, mask, int(mask.max().item() > 0)
-

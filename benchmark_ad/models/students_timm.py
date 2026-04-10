@@ -68,7 +68,7 @@ class UnifiedStudent(nn.Module):
                 )
                 self.backbone_name = candidate
                 break
-            except Exception as exc:  # noqa: BLE001
+            except (RuntimeError, ValueError, TypeError, KeyError) as exc:
                 errors.append(f"{candidate}: {exc}")
         if self.backbone is None:
             raise RuntimeError(f"Cannot create student {model_name}, tried candidates: {errors}")
@@ -101,4 +101,3 @@ def build_student(model_name: str, out_indices: Sequence[int] | None = None, pre
     spec = STUDENT_SPECS[model_name]
     resolved = list(spec.default_out_indices) if out_indices is None else [int(v) for v in out_indices]
     return UnifiedStudent(model_name=model_name, out_indices=resolved, pretrained=pretrained)
-

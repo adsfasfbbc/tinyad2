@@ -87,12 +87,16 @@ class SyntheticAnomalyGenerator:
         max_w = max(5, int(w * self.max_patch_ratio))
         patch_h = random.randint(min_h, max_h)
         patch_w = random.randint(min_w, max_w)
-        patch_h = min(patch_h, h - 1)
-        patch_w = min(patch_w, w - 1)
-        src_y = random.randint(0, h - patch_h - 1)
-        src_x = random.randint(0, w - patch_w - 1)
-        dst_y = random.randint(0, h - patch_h - 1)
-        dst_x = random.randint(0, w - patch_w - 1)
+        patch_h = max(1, min(patch_h, h - 1))
+        patch_w = max(1, min(patch_w, w - 1))
+        max_src_y = max(0, h - patch_h)
+        max_src_x = max(0, w - patch_w)
+        max_dst_y = max(0, h - patch_h)
+        max_dst_x = max(0, w - patch_w)
+        src_y = random.randint(0, max_src_y) if max_src_y > 0 else 0
+        src_x = random.randint(0, max_src_x) if max_src_x > 0 else 0
+        dst_y = random.randint(0, max_dst_y) if max_dst_y > 0 else 0
+        dst_x = random.randint(0, max_dst_x) if max_dst_x > 0 else 0
 
         patch = image[:, src_y : src_y + patch_h, src_x : src_x + patch_w]
         if random.random() < 0.5:
