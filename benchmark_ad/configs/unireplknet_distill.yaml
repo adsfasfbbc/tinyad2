@@ -1,0 +1,45 @@
+runtime:
+  seed: 111
+  device: cuda:0
+  image_size: 256
+  batch_size: 8
+  epochs: 20
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  num_workers: 4
+  log_freq: 20
+  save_freq: 5
+  save_dir: ./experiments/benchmark_ad/unireplknet_s
+
+data:
+  root: "<REPLACE_WITH_YOUR_MVTEC_PATH>"
+  category: all
+  synth_prob: 0.5
+  synthetic_anomaly:
+    perlin_scale_min: 2
+    perlin_scale_max: 6
+    threshold_min: 0.60
+    threshold_max: 0.75
+    blend_alpha: 0.5
+    min_patch_ratio: 0.08
+    max_patch_ratio: 0.30
+
+teacher:
+  backbone: ViT-L/14@336px
+  features_list: [6, 12, 18, 24]
+
+student:
+  name: unireplknet_s
+  out_indices: [0, 1, 2, 3]
+  pretrained: true
+
+distill:
+  deep_token_blocks: 0
+  token_margin: 0.5
+  spatial_margin: 0.3
+  weight_token: 1.0
+  weight_attention: 1.0
+  weight_cls: 0.5
+  weight_spatial: 1.0
+  weight_shallow: 0.2
+

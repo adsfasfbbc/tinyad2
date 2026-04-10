@@ -220,3 +220,44 @@ bash scripts/run_vit_mobilevit_distill.sh
 说明：
 - `Dataset.__getitem__` 在训练模式下支持在线异常合成，返回增强图像、mask 与标签。
 - 教师为 VisualAD ViT（冻结），学生为 MobileViT（可训练），通过 MLP 将学生 token 映射到教师 token 维度后执行三重蒸馏损失。
+
+---
+
+## 9. benchmark_ad：ViT-L/14 多架构异构蒸馏基准（5 学生）
+
+新增目录（按 PRD）：
+- `benchmark_ad/datasets/`
+  - `mvtec.py`（UnifiedMVTecDataset）
+  - `synthetic_anomaly.py`（Perlin + CutPaste 混合）
+- `benchmark_ad/models/`
+  - `teacher_vit.py`（固定 Teacher = VisualAD ViT-L/14）
+  - `students_timm.py`（5 学生统一封装 + A/B/C 路由标记）
+  - `projectors.py`（MLP/1x1/Token->2D）
+- `benchmark_ad/distillation/`
+  - `contrastive_loss.py`
+  - `dispatcher.py`（策略 A/B/C）
+- `benchmark_ad/configs/`
+  - `tinyvit_distill.yaml`
+  - `mobilvit_distill.yaml`
+  - `fastvit_distill.yaml`
+  - `mobilenetv4_distill.yaml`
+  - `unireplknet_distill.yaml`
+- `benchmark_ad/train.py`（训练入口）
+- `benchmark_ad/eval.py`（Image/Pixel AUROC + Heatmap）
+- `benchmark_ad/test_latency.py`（Params/FLOPs/FPS）
+
+一键脚本：
+- `scripts/train_all.sh`：串行训练 5 个学生
+- `scripts/test_latency.sh`：批量延迟评测
+
+示例：
+
+```bash
+python benchmark_ad/train.py --config benchmark_ad/configs/tinyvit_distill.yaml
+python benchmark_ad/eval.py \
+  --config benchmark_ad/configs/tinyvit_distill.yaml \
+  --checkpoint ./experiments/benchmark_ad/tinyvit_11m/tinyvit_11m_final.pth \
+  --save_dir ./experiments/benchmark_ad_eval/tinyvit_11m
+bash scripts/train_all.sh
+bash scripts/test_latency.sh
+```
