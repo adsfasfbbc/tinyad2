@@ -52,13 +52,17 @@ class CutPasteSynthesizer(BaseAnomalySynthesizer):
             max_w = max(5, int(w * self.max_patch_ratio))
             patch_h = int(torch.randint(min_h, max_h + 1, (1,), device=images.device).item())
             patch_w = int(torch.randint(min_w, max_w + 1, (1,), device=images.device).item())
-            patch_h = min(patch_h, h - 1)
-            patch_w = min(patch_w, w - 1)
+            patch_h = max(1, min(patch_h, h - 1))
+            patch_w = max(1, min(patch_w, w - 1))
 
-            src_y = int(torch.randint(0, h - patch_h, (1,), device=images.device).item())
-            src_x = int(torch.randint(0, w - patch_w, (1,), device=images.device).item())
-            dst_y = int(torch.randint(0, h - patch_h, (1,), device=images.device).item())
-            dst_x = int(torch.randint(0, w - patch_w, (1,), device=images.device).item())
+            max_src_y = max(0, h - patch_h)
+            max_src_x = max(0, w - patch_w)
+            max_dst_y = max(0, h - patch_h)
+            max_dst_x = max(0, w - patch_w)
+            src_y = int(torch.randint(0, max_src_y + 1, (1,), device=images.device).item()) if max_src_y > 0 else 0
+            src_x = int(torch.randint(0, max_src_x + 1, (1,), device=images.device).item()) if max_src_x > 0 else 0
+            dst_y = int(torch.randint(0, max_dst_y + 1, (1,), device=images.device).item()) if max_dst_y > 0 else 0
+            dst_x = int(torch.randint(0, max_dst_x + 1, (1,), device=images.device).item()) if max_dst_x > 0 else 0
 
             patch = images[i : i + 1, :, src_y : src_y + patch_h, src_x : src_x + patch_w]
             out[i : i + 1, :, dst_y : dst_y + patch_h, dst_x : dst_x + patch_w] = patch

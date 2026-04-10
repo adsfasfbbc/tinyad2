@@ -68,7 +68,7 @@ class UnifiedStudent(nn.Module):
                 )
                 self.backbone_name = candidate
                 break
-            except (RuntimeError, ValueError, TypeError, KeyError) as exc:
+            except (RuntimeError, KeyError) as exc:
                 errors.append(f"{candidate}: {exc}")
         if self.backbone is None:
             raise RuntimeError(f"Cannot create student {model_name}, tried candidates: {errors}")
