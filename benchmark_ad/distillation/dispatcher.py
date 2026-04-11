@@ -45,8 +45,12 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             [TokenMLPProjector(in_dim=c, out_dim=self.teacher_dim, hidden_dim=max(c, self.teacher_dim)) for c in self.student_stage_channels]
         )
         self.cls_projector = nn.Linear(self.student_stage_channels[-1], self.teacher_dim, bias=False)
-        self.shallow_projectors = nn.ModuleList(
-            [Conv1x1Projector(in_ch=c, out_ch=min(self.teacher_dim, 512)) for c in self.student_stage_channels]
+        self.shallow_align_dims = [min(int(c), self.teacher_dim, 512) for c in self.student_stage_channels]
+        self.shallow_student_projectors = nn.ModuleList(
+            [Conv1x1Projector(in_ch=c, out_ch=d) for c, d in zip(self.student_stage_channels, self.shallow_align_dims)]
+        )
+        self.shallow_teacher_projectors = nn.ModuleList(
+            [TokenToMapProjector(in_dim=self.teacher_dim, out_ch=d) for d in self.shallow_align_dims]
         )
         self.teacher_to_map_projectors = nn.ModuleList(
             [TokenToMapProjector(in_dim=self.teacher_dim, out_ch=c) for c in self.student_stage_channels]
@@ -69,6 +73,12 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             return s, teacher_tokens
         n = min(n_s, n_t)
         return student_tokens[:, :n], teacher_tokens[:, :n]
+
+    @staticmethod
+    def _mse_strict(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+        if a.shape != b.shape:
+            raise RuntimeError(f"shape mismatch for mse: {tuple(a.shape)} vs {tuple(b.shape)}")
+        return F.mse_loss(a, b)
 
     def forward(self, teacher_out: Dict, student_out: Dict, mask: torch.Tensor) -> Dict[str, torch.Tensor]:
         t_tokens: List[torch.Tensor] = teacher_out["patch_tokens"]
@@ -114,9 +124,9 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             shallow_k = max(0, len(s_maps) - self.deep_token_blocks)
             shallow_loss = torch.tensor(0.0, device=t_cls.device)
             for idx in range(shallow_k):
-                s_map = self.shallow_projectors[idx](s_maps[idx])
-                t_map = self.teacher_to_map_projectors[idx](t_tokens[idx], target_hw=s_map.shape[-2:])
-                shallow_loss = shallow_loss + F.mse_loss(s_map, t_map.detach())
+                s_map = self.shallow_student_projectors[idx](s_maps[idx])
+                t_map = self.shallow_teacher_projectors[idx](t_tokens[idx], target_hw=s_map.shape[-2:])
+                shallow_loss = shallow_loss + self._mse_strict(s_map, t_map.detach())
             shallow_loss = shallow_loss / max(1, shallow_k)
 
             cls_loss = self.loss_cls(self.cls_projector(s_cls_raw), t_cls)
@@ -148,4 +158,3 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             diff = F.interpolate(diff, size=(image_size, image_size), mode="bilinear", align_corners=False)
             maps.append(diff[:, 0])
         return torch.stack(maps).sum(dim=0) if maps else torch.zeros((s_maps[0].shape[0], image_size, image_size), device=s_maps[0].device)
-
