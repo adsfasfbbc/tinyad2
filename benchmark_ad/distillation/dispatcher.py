@@ -40,7 +40,8 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         self.w_cls = float(cfg.get("weight_cls", 0.5))
         self.w_spatial = float(cfg.get("weight_spatial", 1.0))
         self.w_shallow = float(cfg.get("weight_shallow", 0.2))
-        # Route-B channel cap for shallow alignment; keeps projection cost bounded on large feature maps.
+        # Route-B channel cap for shallow alignment; 512 is a practical default to bound memory/compute
+        # while retaining enough channel capacity for shallow feature semantics.
         self.shallow_align_max_channels = int(cfg.get("shallow_align_max_channels", 512))
 
         self.token_projectors = nn.ModuleList(
