@@ -47,6 +47,20 @@ def _safe_f1(y_true: np.ndarray, y_score: np.ndarray) -> float:
         return float("nan")
 
 
+def _safe_acc_at_best_f1_threshold(y_true: np.ndarray, y_score: np.ndarray) -> float:
+    try:
+        p, r, thresholds = precision_recall_curve(y_true, y_score)
+        if thresholds.size == 0:
+            return float("nan")
+        f1 = 2 * (p[:-1] * r[:-1]) / (p[:-1] + r[:-1] + 1e-8)
+        best_idx = int(np.nanargmax(f1))
+        best_threshold = thresholds[best_idx]
+        pred = (y_score >= best_threshold).astype(np.float64)
+        return float((pred == y_true).mean())
+    except ValueError:
+        return float("nan")
+
+
 def _avg_ignore_nan(values: List[float]) -> float:
     arr = np.array(values, dtype=np.float64)
     if arr.size == 0:
@@ -123,8 +137,10 @@ class EvalResult:
     pixel_auroc: float
     image_map: float
     image_f1: float
+    image_accuracy: float
     pixel_map: float
     pixel_f1: float
+    pixel_accuracy: float
 
 
 class BaseAdapter:
@@ -320,8 +336,10 @@ def _evaluate_single_dataset(
         pixel_auroc=_safe_auroc(gt_px, pr_px),
         image_map=_safe_ap(gt_img, pr_img),
         image_f1=_safe_f1(gt_img, pr_img),
+        image_accuracy=_safe_acc_at_best_f1_threshold(gt_img, pr_img),
         pixel_map=_safe_ap(gt_px, pr_px),
         pixel_f1=_safe_f1(gt_px, pr_px),
+        pixel_accuracy=_safe_acc_at_best_f1_threshold(gt_px, pr_px),
     )
 
 
@@ -374,7 +392,20 @@ def _build_adapter(model_cfg: Dict[str, Any], device: torch.device) -> BaseAdapt
 
 
 def _markdown_table(rows: List[List[str]]) -> str:
-    headers = ["Model", "Params (M)", "FLOPs (G)", "FPS", "Image-AUROC", "Pixel-AUROC", "MAP", "F1-SCORE"]
+    headers = [
+        "Model",
+        "Params (M)",
+        "FLOPs (G)",
+        "FPS",
+        "Image-AUROC",
+        "Pixel-AUROC",
+        "Image-mAP",
+        "Pixel-mAP",
+        "Image-F1",
+        "Pixel-F1",
+        "Image-ACC",
+        "Pixel-ACC",
+    ]
     lines = [
         "| " + " | ".join(headers) + " |",
         "| " + " | ".join(["---"] * len(headers)) + " |",
@@ -460,16 +491,22 @@ def main() -> None:
                         f"{res.pixel_auroc:.6f}",
                         f"{res.image_map:.6f}",
                         f"{res.image_f1:.6f}",
+                        f"{res.image_accuracy:.6f}",
                         f"{res.pixel_map:.6f}",
                         f"{res.pixel_f1:.6f}",
+                        f"{res.pixel_accuracy:.6f}",
                     ]
                 )
             )
 
         image_auroc_avg = _avg_ignore_nan([m.image_auroc for _, m in dataset_metrics])
         pixel_auroc_avg = _avg_ignore_nan([m.pixel_auroc for _, m in dataset_metrics])
-        map_avg = _avg_ignore_nan([m.image_map for _, m in dataset_metrics])
-        f1_avg = _avg_ignore_nan([m.image_f1 for _, m in dataset_metrics])
+        image_map_avg = _avg_ignore_nan([m.image_map for _, m in dataset_metrics])
+        pixel_map_avg = _avg_ignore_nan([m.pixel_map for _, m in dataset_metrics])
+        image_f1_avg = _avg_ignore_nan([m.image_f1 for _, m in dataset_metrics])
+        pixel_f1_avg = _avg_ignore_nan([m.pixel_f1 for _, m in dataset_metrics])
+        image_acc_avg = _avg_ignore_nan([m.image_accuracy for _, m in dataset_metrics])
+        pixel_acc_avg = _avg_ignore_nan([m.pixel_accuracy for _, m in dataset_metrics])
 
         params_text = f"{params_m:.3f}"
         if onnx_params_m is not None:
@@ -483,20 +520,26 @@ def main() -> None:
                 f"{fps:.2f}",
                 _format_pct(image_auroc_avg),
                 _format_pct(pixel_auroc_avg),
-                _format_pct(map_avg),
-                _format_pct(f1_avg),
+                _format_pct(image_map_avg),
+                _format_pct(pixel_map_avg),
+                _format_pct(image_f1_avg),
+                _format_pct(pixel_f1_avg),
+                _format_pct(image_acc_avg),
+                _format_pct(pixel_acc_avg),
             ]
         )
 
     table_md = _markdown_table(final_rows)
     (output_dir / "core_table.md").write_text(table_md + "\n", encoding="utf-8")
 
-    detail_header = "model,dataset,image_auroc,pixel_auroc,image_map,image_f1,pixel_map,pixel_f1"
+    detail_header = (
+        "model,dataset,image_auroc,pixel_auroc,image_map,image_f1,image_accuracy,pixel_map,pixel_f1,pixel_accuracy"
+    )
     (output_dir / "per_dataset_metrics.csv").write_text(
         detail_header + "\n" + "\n".join(detail_lines) + "\n", encoding="utf-8"
     )
     (output_dir / "core_table.csv").write_text(
-        "Model,Params (M),FLOPs (G),FPS,Image-AUROC,Pixel-AUROC,MAP,F1-SCORE\n"
+        "Model,Params (M),FLOPs (G),FPS,Image-AUROC,Pixel-AUROC,Image-mAP,Pixel-mAP,Image-F1,Pixel-F1,Image-ACC,Pixel-ACC\n"
         + "\n".join([",".join(r) for r in final_rows])
         + "\n",
         encoding="utf-8",

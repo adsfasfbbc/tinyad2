@@ -51,6 +51,20 @@ def _safe_f1(y_true: np.ndarray, y_score: np.ndarray) -> float:
         return float("nan")
 
 
+def _safe_acc_at_best_f1_threshold(y_true: np.ndarray, y_score: np.ndarray) -> float:
+    try:
+        p, r, thresholds = precision_recall_curve(y_true, y_score)
+        if thresholds.size == 0:
+            return float("nan")
+        f1 = 2 * (p[:-1] * r[:-1]) / (p[:-1] + r[:-1] + 1e-8)
+        best_idx = int(np.nanargmax(f1))
+        best_threshold = thresholds[best_idx]
+        pred = (y_score >= best_threshold).astype(np.float64)
+        return float((pred == y_true).mean())
+    except ValueError:
+        return float("nan")
+
+
 def _save_heatmap(anomaly_map: np.ndarray, save_path: Path) -> None:
     import matplotlib.pyplot as plt
 
@@ -153,11 +167,15 @@ def evaluate(config: Dict, checkpoint_path: Path, save_dir: Path, save_heatmaps:
     metrics = {
         "image_auroc": _safe_auroc(image_true, image_pred),
         "pixel_auroc": _safe_auroc(pixel_true, pixel_pred),
-        "image_ap": _safe_ap(image_true, image_pred),
+        "image_map": _safe_ap(image_true, image_pred),
         "image_f1": _safe_f1(image_true, image_pred),
-        "pixel_ap": _safe_ap(pixel_true, pixel_pred),
+        "image_accuracy": _safe_acc_at_best_f1_threshold(image_true, image_pred),
+        "pixel_map": _safe_ap(pixel_true, pixel_pred),
         "pixel_f1": _safe_f1(pixel_true, pixel_pred),
+        "pixel_accuracy": _safe_acc_at_best_f1_threshold(pixel_true, pixel_pred),
     }
+    metrics["image_ap"] = metrics["image_map"]
+    metrics["pixel_ap"] = metrics["pixel_map"]
     return metrics
 
 
@@ -189,4 +207,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
