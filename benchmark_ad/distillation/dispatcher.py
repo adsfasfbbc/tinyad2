@@ -82,7 +82,7 @@ class HeterogeneousDistillationDispatcher(nn.Module):
     @staticmethod
     def _mse_strict(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         if a.shape != b.shape:
-            raise ValueError(f"shape mismatch for mse: {tuple(a.shape)} vs {tuple(b.shape)}")
+            raise ValueError(f"student-teacher shape mismatch for mse: student={tuple(a.shape)} teacher={tuple(b.shape)}")
         return F.mse_loss(a, b)
 
     def forward(self, teacher_out: Dict, student_out: Dict, mask: torch.Tensor) -> Dict[str, torch.Tensor]:
