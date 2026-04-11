@@ -40,12 +40,15 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         self.w_cls = float(cfg.get("weight_cls", 0.5))
         self.w_spatial = float(cfg.get("weight_spatial", 1.0))
         self.w_shallow = float(cfg.get("weight_shallow", 0.2))
+        self.shallow_align_max_channels = int(cfg.get("shallow_align_max_channels", 512))
 
         self.token_projectors = nn.ModuleList(
             [TokenMLPProjector(in_dim=c, out_dim=self.teacher_dim, hidden_dim=max(c, self.teacher_dim)) for c in self.student_stage_channels]
         )
         self.cls_projector = nn.Linear(self.student_stage_channels[-1], self.teacher_dim, bias=False)
-        self.shallow_align_dims = [min(int(c), self.teacher_dim, 512) for c in self.student_stage_channels]
+        self.shallow_align_dims = [
+            min(int(c), self.teacher_dim, self.shallow_align_max_channels) for c in self.student_stage_channels
+        ]
         self.shallow_student_projectors = nn.ModuleList(
             [Conv1x1Projector(in_ch=c, out_ch=d) for c, d in zip(self.student_stage_channels, self.shallow_align_dims)]
         )
@@ -77,7 +80,7 @@ class HeterogeneousDistillationDispatcher(nn.Module):
     @staticmethod
     def _mse_strict(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         if a.shape != b.shape:
-            raise RuntimeError(f"shape mismatch for mse: {tuple(a.shape)} vs {tuple(b.shape)}")
+            raise ValueError(f"shape mismatch for mse: {tuple(a.shape)} vs {tuple(b.shape)}")
         return F.mse_loss(a, b)
 
     def forward(self, teacher_out: Dict, student_out: Dict, mask: torch.Tensor) -> Dict[str, torch.Tensor]:
