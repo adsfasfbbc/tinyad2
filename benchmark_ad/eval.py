@@ -174,6 +174,7 @@ def evaluate(config: Dict, checkpoint_path: Path, save_dir: Path, save_heatmaps:
         "pixel_f1": _safe_f1(pixel_true, pixel_pred),
         "pixel_accuracy": _safe_acc_at_best_f1_threshold(pixel_true, pixel_pred),
     }
+    # Backward compatibility for existing consumers that still read *_ap keys.
     metrics["image_ap"] = metrics["image_map"]
     metrics["pixel_ap"] = metrics["pixel_map"]
     return metrics
