@@ -102,6 +102,7 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         side = int(n**0.5)
         if side * side != n and n > 1:
             maybe_side = int((n - 1) ** 0.5)
+            # If removing exactly one token makes token count a perfect square, treat that token as CLS.
             if maybe_side * maybe_side == (n - 1):
                 # Handle token sequences with leading CLS token: strip CLS, then reshape patch tokens to 2D.
                 tokens = tokens[:, 1:, :]
