@@ -231,11 +231,11 @@ bash scripts/run_vit_mobilevit_distill.sh
   - `synthetic_anomaly.py`（Perlin + CutPaste 混合）
 - `benchmark_ad/models/`
   - `teacher_vit.py`（固定 Teacher = VisualAD ViT-L/14）
-  - `students_timm.py`（5 学生统一封装 + A/B/C 路由标记）
+  - `students_timm.py`（5 学生统一封装；TinyViT/MobileViT 统一走 2D Route-C）
   - `projectors.py`（MLP/1x1/Token->2D）
 - `benchmark_ad/distillation/`
   - `contrastive_loss.py`
-  - `dispatcher.py`（策略 A/B/C）
+  - `dispatcher.py`（Attention 蒸馏关闭；统一 2D 空间蒸馏）
 - `benchmark_ad/configs/`
   - `tinyvit_distill.yaml`
   - `mobilevit_distill.yaml`
@@ -243,12 +243,13 @@ bash scripts/run_vit_mobilevit_distill.sh
   - `mobilenetv4_distill.yaml`
   - `unireplknet_distill.yaml`
 - `benchmark_ad/train.py`（训练入口）
-- `benchmark_ad/eval.py`（Image/Pixel AUROC + Heatmap）
-- `benchmark_ad/test_latency.py`（Params/FLOPs/FPS）
+- `benchmark_ad/eval.py`（统一评测入口：Image/Pixel 指标 + Params/FLOPs/FPS）
+- `benchmark_ad/test_latency.py`（兼容包装，内部复用 eval.py）
 
 一键脚本：
 - `scripts/train_all.sh`：串行训练 5 个学生
-- `scripts/test_latency.sh`：批量延迟评测
+- `scripts/test_latency.sh`：批量延迟评测（调用合并后的 eval.py）
+- `scripts/test_benchmark_ad.sh`：批量“精度+延迟”统一测试
 
 示例：
 
@@ -258,6 +259,12 @@ python benchmark_ad/eval.py \
   --config benchmark_ad/configs/tinyvit_distill.yaml \
   --checkpoint ./experiments/benchmark_ad/tinyvit_11m/tinyvit_11m_final.pth \
   --save_dir ./experiments/benchmark_ad_eval/tinyvit_11m
+python benchmark_ad/eval.py \
+  --config benchmark_ad/configs/tinyvit_distill.yaml \
+  --checkpoint ./experiments/benchmark_ad/tinyvit_11m/tinyvit_11m_final.pth \
+  --save_dir ./experiments/benchmark_ad_eval/tinyvit_11m \
+  --run_latency --no_heatmap
 bash scripts/train_all.sh
 bash scripts/test_latency.sh
+bash scripts/test_benchmark_ad.sh
 ```

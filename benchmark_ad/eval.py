@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
 from benchmark_ad.datasets import UnifiedMVTecDataset
@@ -63,6 +63,54 @@ def _safe_acc_at_best_f1_threshold(y_true: np.ndarray, y_score: np.ndarray) -> f
         return float((pred == y_true).mean())
     except ValueError:
         return float("nan")
+
+
+def _count_params(model: torch.nn.Module) -> float:
+    return float(sum(p.numel() for p in model.parameters()) / 1e6)
+
+
+def _estimate_flops_conv_linear(model: torch.nn.Module, input_tensor: torch.Tensor) -> float:
+    total_flops = 0.0
+    hooks = []
+
+    def conv_hook(mod: torch.nn.Conv2d, inp: Tuple[torch.Tensor], out: torch.Tensor) -> None:
+        nonlocal total_flops
+        out_h, out_w = out.shape[-2], out.shape[-1]
+        kernel_ops = mod.kernel_size[0] * mod.kernel_size[1] * (mod.in_channels / mod.groups)
+        total_flops += float(out.shape[0] * out_h * out_w * mod.out_channels * kernel_ops * 2.0)
+
+    def linear_hook(mod: torch.nn.Linear, inp: Tuple[torch.Tensor], out: torch.Tensor) -> None:
+        nonlocal total_flops
+        x = inp[0]
+        batch = int(np.prod(x.shape[:-1])) if x.dim() > 1 else int(x.shape[0])
+        total_flops += float(batch * mod.in_features * mod.out_features * 2.0)
+
+    for module in model.modules():
+        if isinstance(module, torch.nn.Conv2d):
+            hooks.append(module.register_forward_hook(conv_hook))
+        elif isinstance(module, torch.nn.Linear):
+            hooks.append(module.register_forward_hook(linear_hook))
+
+    with torch.no_grad():
+        _ = model(input_tensor)
+    for h in hooks:
+        h.remove()
+    return total_flops / 1e9
+
+
+@torch.no_grad()
+def _benchmark_fps(model: torch.nn.Module, input_tensor: torch.Tensor, warmup: int = 20, iters: int = 100) -> float:
+    for _ in range(max(1, warmup)):
+        _ = model(input_tensor)
+    if input_tensor.device.type == "cuda":
+        torch.cuda.synchronize(input_tensor.device)
+    t0 = time.time()
+    for _ in range(max(1, iters)):
+        _ = model(input_tensor)
+    if input_tensor.device.type == "cuda":
+        torch.cuda.synchronize(input_tensor.device)
+    elapsed = time.time() - t0
+    return float(max(1, iters) / max(elapsed, 1e-8))
 
 
 def _save_heatmap(anomaly_map: np.ndarray, save_path: Path) -> None:
@@ -180,30 +228,94 @@ def evaluate(config: Dict, checkpoint_path: Path, save_dir: Path, save_heatmaps:
     return metrics
 
 
+def evaluate_latency(
+    checkpoint_path: Path,
+    student_name: Optional[str],
+    image_size: int,
+    device: torch.device,
+    warmup: int,
+    iters: int,
+) -> Dict[str, float]:
+    ckpt = torch.load(str(checkpoint_path), map_location=device)
+    resolved_student_name = student_name or str(ckpt.get("student_name", ""))
+    if not resolved_student_name:
+        raise ValueError("Cannot resolve student_name; pass --student_name or ensure checkpoint has student_name.")
+    student = build_student(
+        model_name=resolved_student_name,
+        out_indices=ckpt.get("student_out_indices"),
+        pretrained=False,
+    ).to(device)
+    student.load_state_dict(ckpt["student_state_dict"], strict=False)
+    student.eval()
+
+    x = torch.randn(1, 3, int(image_size), int(image_size), device=device)
+    return {
+        "params_m": _count_params(student),
+        "flops_g": _estimate_flops_conv_linear(student, x),
+        "fps": _benchmark_fps(student, x, warmup=int(warmup), iters=int(iters)),
+    }
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser("benchmark_ad eval")
-    parser.add_argument("--config", type=str, required=True)
+    parser = argparse.ArgumentParser("benchmark_ad unified eval+latency")
+    parser.add_argument("--config", type=str, default="")
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--save_dir", type=str, default="./experiments/benchmark_ad_eval")
     parser.add_argument("--no_heatmap", action="store_true")
     parser.add_argument("--max_heatmaps", type=int, default=50)
+    parser.add_argument("--run_latency", action="store_true")
+    parser.add_argument("--latency_only", action="store_true")
+    parser.add_argument("--student_name", type=str, default="")
+    parser.add_argument("--image_size", type=int, default=256)
+    parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument("--warmup", type=int, default=20)
+    parser.add_argument("--iters", type=int, default=100)
     args = parser.parse_args()
 
-    cfg = load_yaml(args.config)
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
-    metrics = evaluate(
-        config=cfg,
-        checkpoint_path=Path(args.checkpoint),
-        save_dir=save_dir,
-        save_heatmaps=not args.no_heatmap,
-        max_heatmaps=int(args.max_heatmaps),
-    )
-    out_path = save_dir / "metrics.json"
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(metrics, f, ensure_ascii=False, indent=2)
-    print(json.dumps(metrics, ensure_ascii=False, indent=2))
-    print(f"saved metrics: {out_path}")
+
+    outputs: Dict[str, Dict[str, float]] = {}
+
+    if not args.latency_only:
+        if not args.config:
+            raise ValueError("--config is required unless --latency_only is set.")
+        cfg = load_yaml(args.config)
+        metrics = evaluate(
+            config=cfg,
+            checkpoint_path=Path(args.checkpoint),
+            save_dir=save_dir,
+            save_heatmaps=not args.no_heatmap,
+            max_heatmaps=int(args.max_heatmaps),
+        )
+        out_path = save_dir / "metrics.json"
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(metrics, f, ensure_ascii=False, indent=2)
+        outputs["metrics"] = metrics
+        print(json.dumps(metrics, ensure_ascii=False, indent=2))
+        print(f"saved metrics: {out_path}")
+
+    if args.run_latency or args.latency_only:
+        latency = evaluate_latency(
+            checkpoint_path=Path(args.checkpoint),
+            student_name=args.student_name.strip() or None,
+            image_size=int(args.image_size),
+            device=torch.device(args.device if torch.cuda.is_available() else "cpu"),
+            warmup=int(args.warmup),
+            iters=int(args.iters),
+        )
+        latency_path = save_dir / "latency.json"
+        with latency_path.open("w", encoding="utf-8") as f:
+            json.dump(latency, f, ensure_ascii=False, indent=2)
+        outputs["latency"] = latency
+        print(json.dumps(latency, ensure_ascii=False, indent=2))
+        print(f"saved latency: {latency_path}")
+
+    if len(outputs) > 1:
+        summary_path = save_dir / "summary.json"
+        with summary_path.open("w", encoding="utf-8") as f:
+            json.dump(outputs, f, ensure_ascii=False, indent=2)
+        print(f"saved summary: {summary_path}")
 
 
 if __name__ == "__main__":

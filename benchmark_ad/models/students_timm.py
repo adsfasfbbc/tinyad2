@@ -24,12 +24,12 @@ class StudentSpec:
 
 
 STUDENT_SPECS: Dict[str, StudentSpec] = {
-    "mobilevit_s": StudentSpec(route="B", candidates=["mobilevit_s"], default_out_indices=[1, 2, 3, 4], token_depth=2),
+    "mobilevit_s": StudentSpec(route="C", candidates=["mobilevit_s"], default_out_indices=[1, 2, 3, 4], token_depth=0),
     "tinyvit_11m": StudentSpec(
-        route="A",
+        route="C",
         candidates=["tiny_vit_11m_224", "tinyvit_11m_224"],
         default_out_indices=[0, 1, 2, 3],
-        token_depth=4,
+        token_depth=0,
     ),
     "fastvit_t8": StudentSpec(route="C", candidates=["fastvit_t8", "fasternet_t0"], default_out_indices=[0, 1, 2, 3], token_depth=0),
     "mobilenetv4_hybrid": StudentSpec(

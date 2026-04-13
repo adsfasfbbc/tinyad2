@@ -18,9 +18,9 @@ from benchmark_ad.models.projectors import Conv1x1Projector, TokenMLPProjector, 
 class HeterogeneousDistillationDispatcher(nn.Module):
     """
     Route strategies:
-    - A: token + attention + cls (TinyViT)
-    - B: deep token + shallow feature align + cls (MobileViT/MNv4-Hybrid)
-    - C: teacher token->2D map + spatial contrastive (FastViT/UniRepLKNet)
+    - A: token + cls (attention distillation disabled)
+    - B: deep token + shallow feature align + cls
+    - C: universal token->2D routing + spatial contrastive
     """
 
     def __init__(self, route: str, student_stage_channels: List[int], teacher_dim: int, cfg: Dict) -> None:
@@ -36,7 +36,8 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         self.loss_spatial = SpatialContrastiveLoss(margin=float(cfg.get("spatial_margin", 0.3)))
 
         self.w_token = float(cfg.get("weight_token", 1.0))
-        self.w_attn = float(cfg.get("weight_attention", 1.0))
+        # Hard-disable attention KL distillation to remove unstable gradient source.
+        self.w_attn = 0.0
         self.w_cls = float(cfg.get("weight_cls", 0.5))
         self.w_spatial = float(cfg.get("weight_spatial", 1.0))
         self.w_shallow = float(cfg.get("weight_shallow", 0.2))
@@ -59,6 +60,13 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         )
         self.teacher_to_map_projectors = nn.ModuleList(
             [TokenToMapProjector(in_dim=self.teacher_dim, out_ch=c) for c in self.student_stage_channels]
+        )
+        self.spatial_align_dims = [min(int(c), self.teacher_dim, self.shallow_align_max_channels) for c in self.student_stage_channels]
+        self.student_spatial_projectors = nn.ModuleList(
+            [Conv1x1Projector(in_ch=c, out_ch=d) for c, d in zip(self.student_stage_channels, self.spatial_align_dims)]
+        )
+        self.teacher_spatial_projectors = nn.ModuleList(
+            [TokenToMapProjector(in_dim=self.teacher_dim, out_ch=d) for d in self.spatial_align_dims]
         )
 
     @staticmethod
@@ -83,38 +91,47 @@ class HeterogeneousDistillationDispatcher(nn.Module):
     def _mse_strict(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         if a.shape != b.shape:
             raise ValueError(f"student-teacher shape mismatch for mse: student={tuple(a.shape)} teacher={tuple(b.shape)}")
+        a = F.normalize(a, dim=1, eps=1e-8)
+        b = F.normalize(b, dim=1, eps=1e-8)
         return F.mse_loss(a, b)
+
+    @staticmethod
+    def _tokens_to_map(tokens: torch.Tensor, target_hw: tuple[int, int]) -> torch.Tensor:
+        b, n, d = tokens.shape
+        side = int(n**0.5)
+        if side * side != n and n > 1:
+            maybe_side = int((n - 1) ** 0.5)
+            if maybe_side * maybe_side == (n - 1):
+                tokens = tokens[:, 1:, :]
+                n = n - 1
+                side = maybe_side
+        if side * side != n:
+            raise ValueError(f"Token count {n} cannot be reshaped to square map.")
+        fmap = tokens.transpose(1, 2).reshape(b, d, side, side)
+        if fmap.shape[-2:] != target_hw:
+            fmap = F.interpolate(fmap, size=target_hw, mode="bilinear", align_corners=False)
+        return fmap
 
     def forward(self, teacher_out: Dict, student_out: Dict, mask: torch.Tensor) -> Dict[str, torch.Tensor]:
         t_tokens: List[torch.Tensor] = teacher_out["patch_tokens"]
-        t_attn: List[torch.Tensor] = teacher_out["attention_maps"]
         t_cls: torch.Tensor = teacher_out["cls_token"]
 
         s_maps: List[torch.Tensor] = student_out["feature_maps"]
         s_tokens_all: List[torch.Tensor] = student_out["tokens_all"]
         s_tokens_deep: List[torch.Tensor] = student_out["tokens_deep"]
-        s_attn: List[torch.Tensor] = student_out["attention_maps"]
         s_cls_raw: torch.Tensor = student_out["cls_token"]
 
         if self.route == "A":
             n = min(len(s_tokens_deep), len(t_tokens))
             token_loss = torch.tensor(0.0, device=t_cls.device)
-            attn_loss = torch.tensor(0.0, device=t_cls.device)
             for idx in range(n):
                 s_proj = self.token_projectors[-n + idx](s_tokens_deep[idx])
                 s_proj, t_aligned = self._align_token_count(s_proj, t_tokens[idx])
                 token_loss = token_loss + self.loss_token(s_proj, t_aligned, mask)
-                s_att = torch.softmax(torch.matmul(F.normalize(s_proj, dim=-1), F.normalize(s_proj, dim=-1).transpose(-1, -2)), dim=-1)
-                t_att_map = t_att[idx]
-                if s_att.shape != t_att_map.shape:
-                    m = min(s_att.shape[-1], t_att_map.shape[-1])
-                    s_att = s_att[:, :m, :m]
-                    t_att_map = t_att_map[:, :m, :m]
-                attn_loss = attn_loss + self.loss_attn(s_att, t_att_map)
             token_loss = token_loss / max(1, n)
-            attn_loss = attn_loss / max(1, n)
+            attn_loss = torch.zeros_like(token_loss)
             cls_loss = self.loss_cls(self.cls_projector(s_cls_raw), t_cls)
-            total = self.w_token * token_loss + self.w_attn * attn_loss + self.w_cls * cls_loss
+            total = self.w_token * token_loss + self.w_cls * cls_loss
             return {"total": total, "token": token_loss, "attn": attn_loss, "cls": cls_loss}
 
         if self.route == "B":
@@ -139,11 +156,15 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             return {"total": total, "token": token_loss, "shallow": shallow_loss, "cls": cls_loss}
 
         if self.route == "C":
-            n = min(len(s_maps), len(t_tokens))
+            n = min(len(s_tokens_all), len(t_tokens), len(s_maps))
             spatial = torch.tensor(0.0, device=t_cls.device)
             for idx in range(n):
-                s_map = s_maps[idx]
-                t_map = self.teacher_to_map_projectors[idx](t_tokens[idx], target_hw=s_map.shape[-2:])
+                target_hw = s_maps[idx].shape[-2:]
+                s_map = self._tokens_to_map(s_tokens_all[idx], target_hw=target_hw)
+                s_map = self.student_spatial_projectors[idx](s_map)
+                t_map = self.teacher_spatial_projectors[idx](t_tokens[idx], target_hw=s_map.shape[-2:])
+                s_map = F.normalize(s_map, dim=1, eps=1e-8)
+                t_map = F.normalize(t_map, dim=1, eps=1e-8)
                 spatial = spatial + self.loss_spatial(s_map, t_map.detach(), mask)
             spatial = spatial / max(1, n)
             return {"total": self.w_spatial * spatial, "spatial": spatial}
@@ -154,11 +175,14 @@ class HeterogeneousDistillationDispatcher(nn.Module):
     def anomaly_map(self, teacher_out: Dict, student_out: Dict, image_size: int) -> torch.Tensor:
         t_tokens: List[torch.Tensor] = teacher_out["patch_tokens"]
         s_maps: List[torch.Tensor] = student_out["feature_maps"]
+        s_tokens_all: List[torch.Tensor] = student_out["tokens_all"]
         maps = []
-        n = min(len(s_maps), len(t_tokens))
+        n = min(len(s_maps), len(t_tokens), len(s_tokens_all))
         for idx in range(n):
-            t_map = self.teacher_to_map_projectors[idx](t_tokens[idx], target_hw=s_maps[idx].shape[-2:])
-            s_map = s_maps[idx]
+            target_hw = s_maps[idx].shape[-2:]
+            s_map = self._tokens_to_map(s_tokens_all[idx], target_hw=target_hw)
+            s_map = self.student_spatial_projectors[idx](s_map)
+            t_map = self.teacher_spatial_projectors[idx](t_tokens[idx], target_hw=s_map.shape[-2:])
             diff = (F.normalize(s_map, dim=1, eps=1e-8) - F.normalize(t_map, dim=1, eps=1e-8)).pow(2).mean(dim=1, keepdim=True)
             diff = F.interpolate(diff, size=(image_size, image_size), mode="bilinear", align_corners=False)
             maps.append(diff[:, 0])
