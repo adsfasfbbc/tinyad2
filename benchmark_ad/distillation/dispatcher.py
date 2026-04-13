@@ -36,8 +36,9 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         self.loss_spatial = SpatialContrastiveLoss(margin=float(cfg.get("spatial_margin", 0.3)))
 
         self.w_token = float(cfg.get("weight_token", 1.0))
-        # Hard-disable attention KL distillation to remove unstable gradient source.
-        self.w_attn = 0.0
+        # Emergency ablation default: disable attention KL distillation.
+        self.enable_attention_kl = bool(cfg.get("enable_attention_kl", False))
+        self.w_attn = float(cfg.get("weight_attention", 0.0)) if self.enable_attention_kl else 0.0
         self.w_cls = float(cfg.get("weight_cls", 0.5))
         self.w_spatial = float(cfg.get("weight_spatial", 1.0))
         self.w_shallow = float(cfg.get("weight_shallow", 0.2))
@@ -102,6 +103,7 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         if side * side != n and n > 1:
             maybe_side = int((n - 1) ** 0.5)
             if maybe_side * maybe_side == (n - 1):
+                # Handle token sequences with leading CLS token: strip CLS, then reshape patch tokens to 2D.
                 tokens = tokens[:, 1:, :]
                 n = n - 1
                 side = maybe_side
@@ -114,11 +116,13 @@ class HeterogeneousDistillationDispatcher(nn.Module):
 
     def forward(self, teacher_out: Dict, student_out: Dict, mask: torch.Tensor) -> Dict[str, torch.Tensor]:
         t_tokens: List[torch.Tensor] = teacher_out["patch_tokens"]
+        t_attn: List[torch.Tensor] = teacher_out["attention_maps"]
         t_cls: torch.Tensor = teacher_out["cls_token"]
 
         s_maps: List[torch.Tensor] = student_out["feature_maps"]
         s_tokens_all: List[torch.Tensor] = student_out["tokens_all"]
         s_tokens_deep: List[torch.Tensor] = student_out["tokens_deep"]
+        s_attn: List[torch.Tensor] = student_out["attention_maps"]
         s_cls_raw: torch.Tensor = student_out["cls_token"]
 
         if self.route == "A":
@@ -130,8 +134,18 @@ class HeterogeneousDistillationDispatcher(nn.Module):
                 token_loss = token_loss + self.loss_token(s_proj, t_aligned, mask)
             token_loss = token_loss / max(1, n)
             attn_loss = torch.zeros_like(token_loss)
+            if self.enable_attention_kl and self.w_attn > 0.0:
+                for idx in range(min(len(s_attn), len(t_attn))):
+                    s_att = s_attn[idx]
+                    t_att_map = t_attn[idx]
+                    if s_att.shape != t_att_map.shape:
+                        m = min(s_att.shape[-1], t_att_map.shape[-1])
+                        s_att = s_att[:, :m, :m]
+                        t_att_map = t_att_map[:, :m, :m]
+                    attn_loss = attn_loss + self.loss_attn(s_att, t_att_map)
+                attn_loss = attn_loss / max(1, min(len(s_attn), len(t_attn)))
             cls_loss = self.loss_cls(self.cls_projector(s_cls_raw), t_cls)
-            total = self.w_token * token_loss + self.w_cls * cls_loss
+            total = self.w_token * token_loss + self.w_attn * attn_loss + self.w_cls * cls_loss
             return {"total": total, "token": token_loss, "attn": attn_loss, "cls": cls_loss}
 
         if self.route == "B":

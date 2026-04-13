@@ -38,6 +38,7 @@ distill:
   token_margin: 0.5
   spatial_margin: 0.3
   weight_token: 1.0
+  enable_attention_kl: false
   weight_attention: 0.0
   weight_cls: 0.5
   weight_spatial: 1.0
