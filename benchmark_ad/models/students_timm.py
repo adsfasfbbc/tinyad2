@@ -89,7 +89,12 @@ class UnifiedStudent(nn.Module):
             except (RuntimeError, KeyError) as exc:
                 errors.append(f"{candidate}: {exc}")
         if self.backbone is None:
-            raise RuntimeError(f"Cannot create student {model_name}, tried candidates: {errors}")
+            tried = " -> ".join(self.spec.candidates)
+            detail = " | ".join(errors)
+            raise RuntimeError(
+                f"Cannot create student {model_name}. Candidate order: {tried}. "
+                f"Check timm version/model availability. Errors: {detail}"
+            )
         self.stage_channels = list(self.backbone.feature_info.channels())
 
     @staticmethod

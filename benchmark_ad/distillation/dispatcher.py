@@ -143,6 +143,7 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         if side * side != n and n > 1:
             maybe_side = int((n - 1) ** 0.5)
             if maybe_side * maybe_side == (n - 1):
+                # Handle token sequences with a leading CLS token: strip CLS then reshape patch tokens.
                 tokens = tokens[:, 1:, :]
                 n = n - 1
                 side = maybe_side
