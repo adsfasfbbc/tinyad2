@@ -268,3 +268,29 @@ bash scripts/train_all.sh
 bash scripts/test_latency.sh
 bash scripts/test_benchmark_ad.sh
 ```
+
+---
+
+## 10. Twin-Track 轻量化蒸馏（Route-C+ / Advanced Paradigm）
+
+新增解耦模块：
+- `benchmark_ad/distillation/route_c_plus/losses.py`
+- `benchmark_ad/distillation/advanced_paradigm/losses.py`
+- `benchmark_ad/models/route_c_plus/projectors.py`
+- `benchmark_ad/models/advanced_paradigm/projectors.py`
+
+新增配置：
+- `benchmark_ad/configs/route_c_plus_mobilevit.yaml`
+- `benchmark_ad/configs/advanced_paradigm_fastvit.yaml`
+
+说明：
+- `distill.branch: route_c_plus`：启用 Route-C+（可开关 DS-Projector / L2 Norm / Global Cosine / Boundary Focus）
+- `distill.branch: advanced_paradigm`：启用 Advanced（MGD 优先，支持 SPKD 权重）
+- 训练入口保持不变：`benchmark_ad/train.py`
+- 评测入口保持不变：`benchmark_ad/eval.py`（Image/Pixel AUROC + FPS）
+
+示例：
+```bash
+python benchmark_ad/train.py --config benchmark_ad/configs/route_c_plus_mobilevit.yaml
+python benchmark_ad/train.py --config benchmark_ad/configs/advanced_paradigm_fastvit.yaml
+```

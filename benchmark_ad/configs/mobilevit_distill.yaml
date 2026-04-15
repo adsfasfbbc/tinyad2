@@ -34,6 +34,7 @@ student:
   pretrained: true
 
 distill:
+  branch: route_c_plus
   deep_token_blocks: 2
   token_margin: 0.5
   spatial_margin: 0.3
@@ -43,3 +44,7 @@ distill:
   weight_cls: 0.5
   weight_spatial: 1.0
   weight_shallow: 0.2
+  route_c_plus:
+    enabled: false
+  advanced_paradigm:
+    enabled: false

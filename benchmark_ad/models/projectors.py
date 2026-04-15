@@ -31,6 +31,18 @@ class Conv1x1Projector(nn.Module):
         return self.proj(feat)
 
 
+class DepthwiseSeparableProjector(nn.Module):
+    def __init__(self, in_ch: int, out_ch: int) -> None:
+        super().__init__()
+        in_ch = int(in_ch)
+        out_ch = int(out_ch)
+        self.depthwise = nn.Conv2d(in_ch, in_ch, kernel_size=3, padding=1, groups=in_ch, bias=False)
+        self.pointwise = nn.Conv2d(in_ch, out_ch, kernel_size=1, bias=False)
+
+    def forward(self, feat: torch.Tensor) -> torch.Tensor:
+        return self.pointwise(self.depthwise(feat))
+
+
 class TokenToMapProjector(nn.Module):
     """
     Convert token sequence [B,N,D] to 2D feature map and align to target feature map size.
@@ -48,4 +60,3 @@ class TokenToMapProjector(nn.Module):
         fmap = tokens.transpose(1, 2).reshape(b, d, side, side)
         fmap = F.interpolate(fmap, size=target_hw, mode="bilinear", align_corners=False)
         return self.conv(fmap)
-

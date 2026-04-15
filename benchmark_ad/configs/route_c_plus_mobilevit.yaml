@@ -9,7 +9,7 @@ runtime:
   num_workers: 4
   log_freq: 20
   save_freq: 5
-  save_dir: ./experiments/benchmark_ad/mobilenetv4_hybrid
+  save_dir: ./experiments/benchmark_ad/route_c_plus_mobilevit_s
 
 data:
   root: "<REPLACE_WITH_YOUR_MVTEC_PATH>"
@@ -29,13 +29,13 @@ teacher:
   features_list: [6, 12, 18, 24]
 
 student:
-  name: mobilenetv4_hybrid
+  name: mobilevit_s
   out_indices: [1, 2, 3, 4]
   pretrained: true
 
 distill:
   branch: route_c_plus
-  deep_token_blocks: 2
+  deep_token_blocks: 0
   token_margin: 0.5
   spatial_margin: 0.3
   weight_token: 1.0
@@ -45,6 +45,15 @@ distill:
   weight_spatial: 1.0
   weight_shallow: 0.2
   route_c_plus:
-    enabled: false
+    enabled: true
+    use_ds_projector: true
+    normalize_features: true
+    enable_global_cosine: true
+    weight_local: 1.0
+    weight_global: 0.3
+    boundary_focus:
+      enabled: true
+      dilation: 1
+      weight: 2.0
   advanced_paradigm:
     enabled: false

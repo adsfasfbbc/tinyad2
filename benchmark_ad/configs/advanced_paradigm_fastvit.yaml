@@ -9,7 +9,7 @@ runtime:
   num_workers: 4
   log_freq: 20
   save_freq: 5
-  save_dir: ./experiments/benchmark_ad/mobilenetv4_hybrid
+  save_dir: ./experiments/benchmark_ad/advanced_paradigm_fastvit_t8
 
 data:
   root: "<REPLACE_WITH_YOUR_MVTEC_PATH>"
@@ -29,22 +29,28 @@ teacher:
   features_list: [6, 12, 18, 24]
 
 student:
-  name: mobilenetv4_hybrid
-  out_indices: [1, 2, 3, 4]
+  name: fastvit_t8
+  out_indices: [0, 1, 2, 3]
   pretrained: true
 
 distill:
-  branch: route_c_plus
-  deep_token_blocks: 2
+  branch: advanced_paradigm
+  deep_token_blocks: 0
   token_margin: 0.5
   spatial_margin: 0.3
   weight_token: 1.0
   enable_attention_kl: false
   weight_attention: 0.0
   weight_cls: 0.5
-  weight_spatial: 1.0
-  weight_shallow: 0.2
+  weight_spatial: 0.0
+  weight_shallow: 0.0
   route_c_plus:
     enabled: false
   advanced_paradigm:
-    enabled: false
+    enabled: true
+    method: mgd
+    disable_direct_alignment: true
+    mgd_mask_ratio_min: 0.3
+    mgd_mask_ratio_max: 0.5
+    weight_mgd: 1.0
+    weight_spkd: 0.2

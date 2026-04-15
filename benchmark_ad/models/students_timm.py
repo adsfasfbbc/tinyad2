@@ -32,6 +32,24 @@ STUDENT_SPECS: Dict[str, StudentSpec] = {
         token_depth=0,
     ),
     "fastvit_t8": StudentSpec(route="C", candidates=["fastvit_t8", "fasternet_t0"], default_out_indices=[0, 1, 2, 3], token_depth=0),
+    "efficientvit_b0": StudentSpec(
+        route="C",
+        candidates=["efficientvit_b0", "mobilevit_s"],
+        default_out_indices=[0, 1, 2, 3],
+        token_depth=0,
+    ),
+    "repvit_m1": StudentSpec(
+        route="C",
+        candidates=["repvit_m1", "fastvit_t8", "mobilevit_s"],
+        default_out_indices=[0, 1, 2, 3],
+        token_depth=0,
+    ),
+    "nextvit_small": StudentSpec(
+        route="C",
+        candidates=["nextvit_small", "fastvit_t8", "mobilevit_s"],
+        default_out_indices=[0, 1, 2, 3],
+        token_depth=0,
+    ),
     "mobilenetv4_hybrid": StudentSpec(
         route="B",
         candidates=["mobilenetv4_hybrid_medium", "mobilenetv3_small_100"],
