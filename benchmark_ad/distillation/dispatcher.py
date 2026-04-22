@@ -15,7 +15,7 @@ from benchmark_ad.distillation.contrastive_loss import (
 )
 from benchmark_ad.distillation.route_c_plus.losses import BoundaryAwareSpatialContrastiveLoss, GlobalCosineLoss
 from benchmark_ad.models.advanced_paradigm.projectors import AdvancedParadigmProjector
-from benchmark_ad.models.projectors import Conv1x1Projector, TokenMLPProjector, TokenToMapProjector
+from benchmark_ad.models.projectors import Conv3x3Projector, TokenMLPProjector, TokenToMapProjector
 from benchmark_ad.models.route_c_plus.projectors import DepthwiseSeparableProjector
 
 
@@ -84,7 +84,7 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             min(int(c), self.teacher_dim, self.shallow_align_max_channels) for c in self.student_stage_channels
         ]
         self.shallow_student_projectors = nn.ModuleList(
-            [Conv1x1Projector(in_ch=c, out_ch=d) for c, d in zip(self.student_stage_channels, self.shallow_align_dims)]
+            [Conv3x3Projector(in_ch=c, out_ch=d) for c, d in zip(self.student_stage_channels, self.shallow_align_dims)]
         )
         self.shallow_teacher_projectors = nn.ModuleList(
             [TokenToMapProjector(in_dim=self.teacher_dim, out_ch=d) for d in self.shallow_align_dims]
@@ -103,7 +103,7 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             )
         else:
             self.student_spatial_projectors = nn.ModuleList(
-                [Conv1x1Projector(in_ch=c, out_ch=d) for c, d in zip(self.student_stage_channels, self.spatial_align_dims)]
+                [Conv3x3Projector(in_ch=c, out_ch=d) for c, d in zip(self.student_stage_channels, self.spatial_align_dims)]
             )
         self.teacher_spatial_projectors = nn.ModuleList(
             [TokenToMapProjector(in_dim=self.teacher_dim, out_ch=d) for d in self.spatial_align_dims]
