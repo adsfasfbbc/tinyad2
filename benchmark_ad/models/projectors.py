@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -32,7 +34,13 @@ class Conv3x3Projector(nn.Module):
 
 
 class Conv1x1Projector(Conv3x3Projector):
-    pass
+    def __init__(self, in_ch: int, out_ch: int) -> None:
+        warnings.warn(
+            "Conv1x1Projector now uses a 3x3 kernel. Please migrate to Conv3x3Projector.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(in_ch=in_ch, out_ch=out_ch)
 
 
 class DepthwiseSeparableProjector(nn.Module):
