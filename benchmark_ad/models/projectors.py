@@ -25,7 +25,7 @@ class TokenMLPProjector(nn.Module):
 class Conv1x1Projector(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.proj = nn.Conv2d(int(in_ch), int(out_ch), kernel_size=1, bias=False)
+        self.proj = nn.Conv2d(int(in_ch), int(out_ch), kernel_size=3, padding=1, bias=False)
 
     def forward(self, feat: torch.Tensor) -> torch.Tensor:
         return self.proj(feat)
@@ -37,7 +37,7 @@ class DepthwiseSeparableProjector(nn.Module):
         in_ch = int(in_ch)
         out_ch = int(out_ch)
         self.depthwise = nn.Conv2d(in_ch, in_ch, kernel_size=3, padding=1, groups=in_ch, bias=False)
-        self.pointwise = nn.Conv2d(in_ch, out_ch, kernel_size=1, bias=False)
+        self.pointwise = nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1, bias=False)
 
     def forward(self, feat: torch.Tensor) -> torch.Tensor:
         return self.pointwise(self.depthwise(feat))
@@ -50,7 +50,7 @@ class TokenToMapProjector(nn.Module):
 
     def __init__(self, in_dim: int, out_ch: int) -> None:
         super().__init__()
-        self.conv = nn.Conv2d(int(in_dim), int(out_ch), kernel_size=1, bias=False)
+        self.conv = nn.Conv2d(int(in_dim), int(out_ch), kernel_size=3, padding=1, bias=False)
 
     def forward(self, tokens: torch.Tensor, target_hw: tuple[int, int]) -> torch.Tensor:
         b, n, d = tokens.shape

@@ -232,7 +232,7 @@ bash scripts/run_vit_mobilevit_distill.sh
 - `benchmark_ad/models/`
   - `teacher_vit.py`（固定 Teacher = VisualAD ViT-L/14）
   - `students_timm.py`（5 学生统一封装；TinyViT/MobileViT 统一走 2D Route-C）
-  - `projectors.py`（MLP/1x1/Token->2D）
+- `projectors.py`（MLP/3x3/Token->2D）
 - `benchmark_ad/distillation/`
   - `contrastive_loss.py`
   - `dispatcher.py`（Attention 蒸馏关闭；统一 2D 空间蒸馏）
