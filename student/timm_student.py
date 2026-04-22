@@ -43,7 +43,7 @@ class TimmStudent(nn.Module):
 
         self.align_layers = nn.ModuleList(
             [
-                # Bias is disabled to keep projection/alignment behavior consistent with other projector layers.
+                # Bias is disabled to match the projector design pattern used throughout this repository.
                 nn.Conv2d(in_channels=s_c, out_channels=t_c, kernel_size=3, padding=1, bias=False)
                 for s_c, t_c in zip(self._student_channels, self.teacher_channels)
             ]

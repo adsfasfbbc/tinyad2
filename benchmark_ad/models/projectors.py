@@ -27,10 +27,10 @@ class TokenMLPProjector(nn.Module):
 class Conv3x3Projector(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.proj = nn.Conv2d(int(in_ch), int(out_ch), kernel_size=3, padding=1, bias=False)
+        self.projection = nn.Conv2d(int(in_ch), int(out_ch), kernel_size=3, padding=1, bias=False)
 
     def forward(self, feat: torch.Tensor) -> torch.Tensor:
-        return self.proj(feat)
+        return self.projection(feat)
 
 
 class Conv1x1Projector(Conv3x3Projector):
@@ -62,7 +62,7 @@ class TokenToMapProjector(nn.Module):
 
     def __init__(self, in_dim: int, out_ch: int) -> None:
         super().__init__()
-        self.conv = nn.Conv2d(int(in_dim), int(out_ch), kernel_size=3, padding=1, bias=False)
+        self.projection = nn.Conv2d(int(in_dim), int(out_ch), kernel_size=3, padding=1, bias=False)
 
     def forward(self, tokens: torch.Tensor, target_hw: tuple[int, int]) -> torch.Tensor:
         b, n, d = tokens.shape
@@ -71,4 +71,4 @@ class TokenToMapProjector(nn.Module):
             raise ValueError(f"Token count {n} cannot be reshaped to square map.")
         fmap = tokens.transpose(1, 2).reshape(b, d, side, side)
         fmap = F.interpolate(fmap, size=target_hw, mode="bilinear", align_corners=False)
-        return self.conv(fmap)
+        return self.projection(fmap)
