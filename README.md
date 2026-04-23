@@ -244,7 +244,6 @@ bash scripts/run_vit_mobilevit_distill.sh
   - `unireplknet_distill.yaml`
 - `benchmark_ad/train.py`（训练入口）
 - `benchmark_ad/eval.py`（统一评测入口：Image/Pixel 指标 + Params/FLOPs/FPS）
-- `benchmark_ad/test_latency.py`（兼容包装，内部复用 eval.py）
 
 一键脚本：
 - `scripts/train_all.sh`：串行训练 5 个学生
