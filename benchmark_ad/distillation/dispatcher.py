@@ -54,6 +54,8 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         self.route_plus_normalize = bool(route_plus_cfg.get("normalize_features", True))
         self.route_plus_global = bool(route_plus_cfg.get("enable_global_cosine", False))
         self.route_plus_w_global = float(route_plus_cfg.get("weight_global", 0.0))
+        self.route_plus_cls_global = bool(route_plus_cfg.get("enable_cls_global", False))
+        self.route_plus_w_cls_global = float(route_plus_cfg.get("weight_cls_global", 0.0))
         self.route_plus_w_local = float(route_plus_cfg.get("weight_local", 1.0))
         self.route_plus_loss = BoundaryAwareSpatialContrastiveLoss(
             margin=float(route_plus_cfg.get("spatial_margin", cfg.get("spatial_margin", 0.3))),
@@ -154,7 +156,16 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             fmap = F.interpolate(fmap, size=target_hw, mode="bilinear", align_corners=False)
         return fmap
 
-    def _route_c_forward(self, t_tokens: List[torch.Tensor], s_tokens_all: List[torch.Tensor], s_maps: List[torch.Tensor], mask: torch.Tensor, device: torch.device) -> Dict[str, torch.Tensor]:
+    def _route_c_forward(
+        self,
+        t_tokens: List[torch.Tensor],
+        s_tokens_all: List[torch.Tensor],
+        s_maps: List[torch.Tensor],
+        mask: torch.Tensor,
+        device: torch.device,
+        t_cls: torch.Tensor,
+        s_cls_raw: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
         n = min(len(s_tokens_all), len(t_tokens), len(s_maps))
 
         if self.advanced_enabled and self.distill_branch == "advanced_paradigm":
@@ -198,8 +209,17 @@ class HeterogeneousDistillationDispatcher(nn.Module):
         local = local / max(1, n)
         global_loss = global_loss / max(1, n)
         if self.route_plus_enabled and self.distill_branch == "route_c_plus":
-            total = self.route_plus_w_local * local + self.route_plus_w_global * global_loss
-            return {"total": total, "spatial": local, "global": global_loss}
+            cls_global = torch.tensor(0.0, device=device)
+            if self.route_plus_cls_global:
+                s_cls = F.normalize(self.cls_projector(s_cls_raw), dim=1, eps=1e-8)
+                t_cls_norm = F.normalize(t_cls.detach(), dim=1, eps=1e-8)
+                cls_global = (1.0 - F.cosine_similarity(s_cls, t_cls_norm, dim=1)).mean()
+            total = (
+                self.route_plus_w_local * local
+                + self.route_plus_w_global * global_loss
+                + self.route_plus_w_cls_global * cls_global
+            )
+            return {"total": total, "spatial": local, "global": global_loss, "cls_global": cls_global}
         return {"total": self.w_spatial * local, "spatial": local}
 
     def forward(self, teacher_out: Dict, student_out: Dict, mask: torch.Tensor) -> Dict[str, torch.Tensor]:
@@ -258,7 +278,15 @@ class HeterogeneousDistillationDispatcher(nn.Module):
             return {"total": total, "token": token_loss, "shallow": shallow_loss, "cls": cls_loss}
 
         if self.route == "C":
-            return self._route_c_forward(t_tokens=t_tokens, s_tokens_all=s_tokens_all, s_maps=s_maps, mask=mask, device=t_cls.device)
+            return self._route_c_forward(
+                t_tokens=t_tokens,
+                s_tokens_all=s_tokens_all,
+                s_maps=s_maps,
+                mask=mask,
+                device=t_cls.device,
+                t_cls=t_cls,
+                s_cls_raw=s_cls_raw,
+            )
 
         raise ValueError(f"Unsupported route: {self.route}")
 

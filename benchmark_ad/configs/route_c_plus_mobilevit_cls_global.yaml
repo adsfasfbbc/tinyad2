@@ -9,7 +9,7 @@ runtime:
   num_workers: 4
   log_freq: 20
   save_freq: 5
-  save_dir: ./experiments/benchmark_ad/route_c_plus_mobilevit_s
+  save_dir: ./experiments/benchmark_ad/route_c_plus_mobilevit_s_cls_global
 
 data:
   root: "<REPLACE_WITH_YOUR_MVTEC_PATH>"
@@ -48,11 +48,11 @@ distill:
     enabled: true
     use_ds_projector: true
     normalize_features: true
-    enable_global_cosine: true
-    enable_cls_global: false
+    enable_global_cosine: false
+    enable_cls_global: true
     weight_local: 1.0
-    weight_global: 0.3
-    weight_cls_global: 0.0
+    weight_global: 0.0
+    weight_cls_global: 0.3
     boundary_focus:
       enabled: true
       dilation: 1
