@@ -13,7 +13,6 @@ from sklearn.metrics import average_precision_score, precision_recall_curve, roc
 from benchmark_ad.datasets import UnifiedMVTecDataset
 from benchmark_ad.distillation import HeterogeneousDistillationDispatcher
 from benchmark_ad.models import VisualADTeacherViTL14, build_student
-from utils.scoring import DEFAULT_TOPK_RATIO, reduce_anomaly_map
 from utils.transforms import get_transform
 
 
@@ -125,8 +124,23 @@ def _save_heatmap(anomaly_map: np.ndarray, save_path: Path) -> None:
     plt.close()
 
 
+def _reduce_anomaly_map_topk(anomaly_map: torch.Tensor, k: int = 100) -> torch.Tensor:
+    if anomaly_map.dim() < 2:
+        raise ValueError(f"anomaly_map must have at least 2 dims (B, ...), got {tuple(anomaly_map.shape)}")
+    flat_map = anomaly_map.reshape(anomaly_map.shape[0], -1)
+    topk = max(1, min(int(k), int(flat_map.shape[1])))
+    return torch.topk(flat_map, k=topk, dim=1).values.mean(dim=1)
+
+
 @torch.no_grad()
-def evaluate(config: Dict, checkpoint_path: Path, save_dir: Path, save_heatmaps: bool = True, max_heatmaps: int = 50) -> Dict:
+def evaluate(
+    config: Dict,
+    checkpoint_path: Path,
+    save_dir: Path,
+    save_heatmaps: bool = True,
+    max_heatmaps: int = 50,
+    image_topk: int = 100,
+) -> Dict:
     runtime = config.get("runtime", {})
     data_cfg = config.get("data", {})
     teacher_cfg = config.get("teacher", {})
@@ -193,7 +207,7 @@ def evaluate(config: Dict, checkpoint_path: Path, save_dir: Path, save_heatmaps:
         amap = dispatcher.anomaly_map(_teacher_to_dict(t_out), s_out, image_size=image_size)
         amap = torch.nan_to_num(amap, nan=0.0, posinf=0.0, neginf=0.0)
 
-        img_score = reduce_anomaly_map(amap, mode="topk_mean", topk_ratio=DEFAULT_TOPK_RATIO)
+        img_score = _reduce_anomaly_map_topk(amap, k=image_topk)
         image_labels.extend(labels.detach().cpu().numpy().tolist())
         image_scores.extend(img_score.detach().cpu().numpy().tolist())
 
@@ -271,6 +285,7 @@ def main() -> None:
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--warmup", type=int, default=20)
     parser.add_argument("--iters", type=int, default=100)
+    parser.add_argument("--image_topk", type=int, default=100)
     args = parser.parse_args()
 
     save_dir = Path(args.save_dir)
@@ -288,6 +303,7 @@ def main() -> None:
             save_dir=save_dir,
             save_heatmaps=not args.no_heatmap,
             max_heatmaps=int(args.max_heatmaps),
+            image_topk=int(args.image_topk),
         )
         out_path = save_dir / "metrics.json"
         with out_path.open("w", encoding="utf-8") as f:
