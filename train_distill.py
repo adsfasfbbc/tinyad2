@@ -10,7 +10,7 @@ from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets.folder import default_loader
 
-from models import DistillationAdapter, OpenCLIPTeacher, VMambaStudent
+from models import DistillationAdapter, VMambaStudent, VisualADTeacher
 from utils.distill_loss import DistillLossConfig, DistillationLoss
 from utils.distill_transforms import get_distill_train_transform
 
@@ -81,7 +81,7 @@ def main() -> None:
     ds = UnlabeledImageDataset(args.train_root, tfm)
     dl = DataLoader(ds, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, drop_last=True)
 
-    teacher = OpenCLIPTeacher(layers=args.teacher_layers, device=device)
+    teacher = VisualADTeacher(layers=args.teacher_layers, device=device)
     student = VMambaStudent(pretrained=args.student_pretrained, use_fallback_if_unavailable=args.allow_fallback_student).to(device)
     adapter = DistillationAdapter(stage_channels=student.stage_channels, output_dim=1024, target_hw=24).to(device)
 
