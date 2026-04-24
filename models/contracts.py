@@ -8,7 +8,7 @@ import torch
 
 @dataclass
 class TeacherOutput:
-    """Feature contract for frozen CLIP teacher."""
+    """Feature contract for frozen VisualAD vision teacher."""
 
     patch_tokens: Dict[int, torch.Tensor]  # layer -> [B, 576, 1024]
     cls_tokens: Dict[int, torch.Tensor]  # layer -> [B, 1024]
