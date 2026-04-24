@@ -103,7 +103,9 @@ class VMambaStudent(nn.Module):
             return {i + 1: out[i] for i in range(4)}
 
         raise RuntimeError(
-            f"Unable to parse VMamba stage outputs from type={type(out)}."
+            "Unable to parse VMamba stage outputs. Expected dict with keys 1-4, "
+            "list/tuple of length >=4, or forward_features-compatible dict. "
+            f"Got type={type(out)}."
         )
 
     def forward(self, images: torch.Tensor) -> StudentOutput:

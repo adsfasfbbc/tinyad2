@@ -8,6 +8,7 @@ from torchvision import transforms
 
 @dataclass
 class ResizeWithAspectPad:
+    """Resize an image to fit within target_size and pad to a square canvas."""
     target_size: int
     fill: int = 0
 

@@ -11,7 +11,7 @@ from .contracts import TeacherOutput
 class OpenCLIPTeacher(nn.Module):
     """
     Frozen OpenCLIP ViT-L/14@336 teacher extracting multi-layer patch/cls tokens.
-    Expected outputs:
+    For ViT-L/14@336 specifically, expected outputs are:
       - patch_tokens[layer]: [B, 576, 1024]
       - cls_tokens[layer]: [B, 1024]
     """

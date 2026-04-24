@@ -25,7 +25,7 @@ class DistillationLoss(nn.Module):
 
     @staticmethod
     def _teacher_tokens_to_map(tokens: torch.Tensor, hw: int = 24) -> torch.Tensor:
-        # tokens: [B, 576, 1024] -> [B, 1024, 24, 24]
+        # tokens: [B, hw*hw, C] -> [B, C, hw, hw]
         b, n, c = tokens.shape
         if n != hw * hw:
             raise ValueError(f"Expected {hw * hw} tokens, got {n}.")
