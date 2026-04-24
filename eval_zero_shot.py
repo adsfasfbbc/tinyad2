@@ -151,9 +151,9 @@ def main() -> None:
     pixel_f1 = f1_score(pixel_gt_np, pixel_pred, zero_division=0)
 
     # PRO-score
-    masks_reshaped = np.stack([x.reshape(args.image_size, args.image_size) for x in pixel_gt])
+    gt_masks_2d = np.stack([x.reshape(args.image_size, args.image_size) for x in pixel_gt])
     amaps = np.stack([x.reshape(args.image_size, args.image_size) for x in pixel_scores])
-    pro_score = cal_pro_score(masks=masks_reshaped, amaps=amaps)
+    pro_score = cal_pro_score(masks=gt_masks_2d, amaps=amaps)
 
     print("=== Zero-shot Evaluation Results ===")
     print(f"Image-AUROC: {image_auroc:.4f}")
