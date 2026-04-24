@@ -24,12 +24,12 @@ class DistillationLoss(nn.Module):
         self.cfg = cfg
 
     @staticmethod
-    def _teacher_tokens_to_map(tokens: torch.Tensor, hw: int = 24) -> torch.Tensor:
-        # tokens: [B, hw*hw, C] -> [B, C, hw, hw]
+    def _teacher_tokens_to_map(tokens: torch.Tensor, grid_size: int = 24) -> torch.Tensor:
+        # tokens: [B, grid_size*grid_size, C] -> [B, C, grid_size, grid_size]
         b, n, c = tokens.shape
-        if n != hw * hw:
-            raise ValueError(f"Expected {hw * hw} tokens, got {n}.")
-        return tokens.reshape(b, hw, hw, c).permute(0, 3, 1, 2).contiguous()
+        if n != grid_size * grid_size:
+            raise ValueError(f"Expected {grid_size * grid_size} tokens, got {n}.")
+        return tokens.reshape(b, grid_size, grid_size, c).permute(0, 3, 1, 2).contiguous()
 
     @staticmethod
     def _dense_term(student: torch.Tensor, teacher: torch.Tensor) -> torch.Tensor:

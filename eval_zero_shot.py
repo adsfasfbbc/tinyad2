@@ -51,7 +51,7 @@ def _find_best_f1_threshold(y_true: np.ndarray, y_score: np.ndarray) -> float:
     unique = np.unique(y_score)
     if unique.size > MAX_THRESHOLD_SAMPLES:
         qs = np.linspace(0.0, 1.0, MAX_THRESHOLD_SAMPLES + 1)
-        unique = np.quantile(y_score, qs)
+        unique = np.unique(np.quantile(y_score, qs))
     best_t, best_f1 = 0.0, -1.0
     for t in unique:
         pred = (y_score >= t).astype(np.int32)

@@ -98,7 +98,7 @@ def main() -> None:
         weight_decay=args.weight_decay,
     )
     amp_enabled = args.amp and device.type == "cuda"
-    scaler = GradScaler(enabled=amp_enabled) if amp_enabled else None
+    scaler = GradScaler(enabled=amp_enabled)
 
     wandb_run = None
     if args.use_wandb:
@@ -127,13 +127,13 @@ def main() -> None:
 
                 total_loss = losses["loss_total"]
 
-                if torch.isnan(total_loss) or torch.isinf(total_loss):
+                if not torch.isfinite(total_loss):
                     nan_skip_count += 1
                     if nan_skip_count == 1 or nan_skip_count % 10 == 0:
                         print(f"[warn] Skipping NaN/Inf loss batch. Total skipped: {nan_skip_count}")
                     continue
 
-            if amp_enabled and scaler is not None:
+            if amp_enabled:
                 scaler.scale(total_loss).backward()
                 scaler.unscale_(optim)
                 torch.nn.utils.clip_grad_norm_(list(student.parameters()) + list(adapter.parameters()), max_norm=args.grad_clip)
