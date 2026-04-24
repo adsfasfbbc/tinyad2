@@ -139,6 +139,7 @@ def _gaussian_smooth_anomaly_map(anomaly_map: torch.Tensor, kernel_size: int = 3
     Args:
         anomaly_map: Tensor with shape [B, H, W] or [B, C, H, W].
         kernel_size: Gaussian kernel size; values <= 1 disable smoothing.
+            Even values are auto-adjusted to the next odd value.
         sigma: Gaussian sigma; values <= 0 disable smoothing.
 
     Returns:
