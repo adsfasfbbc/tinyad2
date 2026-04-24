@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
+import torchvision.transforms.functional as tvf
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
 from benchmark_ad.datasets import UnifiedMVTecDataset
@@ -132,6 +133,19 @@ def _reduce_anomaly_map_topk(anomaly_map: torch.Tensor, k: int = 100) -> torch.T
     return torch.topk(flat_map, k=topk, dim=1).values.mean(dim=1)
 
 
+def _gaussian_smooth_anomaly_map(anomaly_map: torch.Tensor, kernel_size: int = 33, sigma: float = 4.0) -> torch.Tensor:
+    if float(sigma) <= 0.0 or int(kernel_size) <= 1:
+        return anomaly_map
+    k = int(kernel_size)
+    if k % 2 == 0:
+        k += 1
+    if anomaly_map.dim() == 3:
+        return tvf.gaussian_blur(anomaly_map.unsqueeze(1), kernel_size=[k, k], sigma=[float(sigma), float(sigma)]).squeeze(1)
+    if anomaly_map.dim() == 4:
+        return tvf.gaussian_blur(anomaly_map, kernel_size=[k, k], sigma=[float(sigma), float(sigma)])
+    raise ValueError(f"anomaly_map must be 3D or 4D, got {tuple(anomaly_map.shape)}")
+
+
 @torch.no_grad()
 def evaluate(
     config: Dict,
@@ -140,6 +154,8 @@ def evaluate(
     save_heatmaps: bool = True,
     max_heatmaps: int = 50,
     image_topk: int = 100,
+    image_blur_kernel: int = 33,
+    image_blur_sigma: float = 4.0,
 ) -> Dict:
     runtime = config.get("runtime", {})
     data_cfg = config.get("data", {})
@@ -207,7 +223,8 @@ def evaluate(
         amap = dispatcher.anomaly_map(_teacher_to_dict(t_out), s_out, image_size=image_size)
         amap = torch.nan_to_num(amap, nan=0.0, posinf=0.0, neginf=0.0)
 
-        img_score = _reduce_anomaly_map_topk(amap, k=image_topk)
+        amap_for_image = _gaussian_smooth_anomaly_map(amap, kernel_size=image_blur_kernel, sigma=image_blur_sigma)
+        img_score = _reduce_anomaly_map_topk(amap_for_image, k=image_topk)
         image_labels.extend(labels.detach().cpu().numpy().tolist())
         image_scores.extend(img_score.detach().cpu().numpy().tolist())
 
@@ -286,6 +303,8 @@ def main() -> None:
     parser.add_argument("--warmup", type=int, default=20)
     parser.add_argument("--iters", type=int, default=100)
     parser.add_argument("--image_topk", type=int, default=100)
+    parser.add_argument("--image_blur_kernel", type=int, default=33)
+    parser.add_argument("--image_blur_sigma", type=float, default=4.0)
     args = parser.parse_args()
 
     save_dir = Path(args.save_dir)
@@ -304,6 +323,8 @@ def main() -> None:
             save_heatmaps=not args.no_heatmap,
             max_heatmaps=int(args.max_heatmaps),
             image_topk=int(args.image_topk),
+            image_blur_kernel=int(args.image_blur_kernel),
+            image_blur_sigma=float(args.image_blur_sigma),
         )
         out_path = save_dir / "metrics.json"
         with out_path.open("w", encoding="utf-8") as f:
