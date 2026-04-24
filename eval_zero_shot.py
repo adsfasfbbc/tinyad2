@@ -69,6 +69,8 @@ def main() -> None:
     parser.add_argument("--image_size", type=int, default=512)
     parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--sigma", type=float, default=4.0)
+    parser.add_argument("--fusion_stages", type=int, nargs="+", default=[3, 4], help="Adapter stage indices to fuse")
+    parser.add_argument("--fusion_weights", type=float, nargs="+", default=[0.5, 0.5], help="Fusion weights for fusion_stages")
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--allow_fallback_student", action="store_true")
     args = parser.parse_args()
@@ -97,6 +99,12 @@ def main() -> None:
     adapter.eval()
 
     normal_text, anomaly_text = _load_prompt_embeddings(args.prompt_path, device)
+    if len(args.fusion_stages) != len(args.fusion_weights):
+        raise ValueError("fusion_stages and fusion_weights must have same length.")
+    weight_sum = float(sum(args.fusion_weights))
+    if weight_sum <= 0:
+        raise ValueError("fusion_weights sum must be > 0.")
+    norm_weights = [w / weight_sum for w in args.fusion_weights]
 
     image_gt: List[int] = []
     image_scores: List[float] = []
@@ -112,8 +120,12 @@ def main() -> None:
             student_out = student(image)
             adapter_out = adapter(student_out)
 
-            # Use high-level stage fusion (stage3 + stage4)
-            dense = 0.5 * (adapter_out.dense[3] + adapter_out.dense[4])
+            dense = None
+            for stage, w in zip(args.fusion_stages, norm_weights):
+                if stage not in adapter_out.dense:
+                    raise KeyError(f"Requested fusion stage {stage} not found in adapter outputs.")
+                part = w * adapter_out.dense[stage]
+                dense = part if dense is None else (dense + part)
             amap_batch = _dense_to_map(dense, normal_text, anomaly_text, out_hw=args.image_size).cpu().numpy()
 
             for idx in range(amap_batch.shape[0]):

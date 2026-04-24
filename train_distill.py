@@ -97,7 +97,8 @@ def main() -> None:
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
-    scaler = GradScaler(enabled=args.amp and device.type == "cuda")
+    amp_enabled = args.amp and device.type == "cuda"
+    scaler = GradScaler(enabled=True) if amp_enabled else None
 
     wandb_run = None
     if args.use_wandb:
@@ -116,7 +117,7 @@ def main() -> None:
             images = images.to(device, non_blocking=True)
 
             optim.zero_grad(set_to_none=True)
-            with autocast(enabled=scaler.is_enabled()):
+            with autocast(enabled=amp_enabled):
                 with torch.no_grad():
                     teacher_out = teacher(images)
 
@@ -132,11 +133,16 @@ def main() -> None:
                         print(f"[warn] Skipping NaN/Inf loss batch. Total skipped: {nan_skip_count}")
                     continue
 
-            scaler.scale(total_loss).backward()
-            scaler.unscale_(optim)
-            torch.nn.utils.clip_grad_norm_(list(student.parameters()) + list(adapter.parameters()), max_norm=args.grad_clip)
-            scaler.step(optim)
-            scaler.update()
+            if amp_enabled and scaler is not None:
+                scaler.scale(total_loss).backward()
+                scaler.unscale_(optim)
+                torch.nn.utils.clip_grad_norm_(list(student.parameters()) + list(adapter.parameters()), max_norm=args.grad_clip)
+                scaler.step(optim)
+                scaler.update()
+            else:
+                total_loss.backward()
+                torch.nn.utils.clip_grad_norm_(list(student.parameters()) + list(adapter.parameters()), max_norm=args.grad_clip)
+                optim.step()
 
             if wandb_run is not None:
                 wandb_run.log(
