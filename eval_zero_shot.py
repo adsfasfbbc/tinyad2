@@ -45,7 +45,7 @@ def _dense_to_map(dense: torch.Tensor, normal: torch.Tensor, anomaly: torch.Tens
     return F.interpolate(score.unsqueeze(1), size=(out_hw, out_hw), mode="bilinear", align_corners=False).squeeze(1)
 
 
-def _best_f1_threshold(y_true: np.ndarray, y_score: np.ndarray) -> float:
+def _find_best_f1_threshold(y_true: np.ndarray, y_score: np.ndarray) -> float:
     unique = np.unique(y_score)
     if unique.size > 512:
         qs = np.linspace(0.0, 1.0, 513)
@@ -67,6 +67,7 @@ def main() -> None:
     parser.add_argument("--checkpoint_path", type=str, required=True)
     parser.add_argument("--prompt_path", type=str, required=True, help=".pt file with normal/anomaly text embeddings")
     parser.add_argument("--image_size", type=int, default=512)
+    parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--sigma", type=float, default=4.0)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--allow_fallback_student", action="store_true")
@@ -83,7 +84,7 @@ def main() -> None:
         target_transform=target_transform,
         dataset_name=args.test_dataset,
     )
-    dl = torch.utils.data.DataLoader(ds, batch_size=1, shuffle=False)
+    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, shuffle=False)
 
     ckpt = torch.load(args.checkpoint_path, map_location=device)
 
@@ -105,23 +106,30 @@ def main() -> None:
     with torch.no_grad():
         for items in tqdm(dl):
             image = items["img"].to(device)
-            mask = items["img_mask"].squeeze(0).squeeze(0).numpy().astype(np.uint8)
-            gt_label = int(items["anomaly"].item())
+            masks = items["img_mask"].squeeze(1).cpu().numpy().astype(np.uint8)  # [B, H, W]
+            labels = items["anomaly"].cpu().numpy().astype(np.int32)  # [B]
 
             student_out = student(image)
             adapter_out = adapter(student_out)
 
             # Use high-level stage fusion (stage3 + stage4)
             dense = 0.5 * (adapter_out.dense[3] + adapter_out.dense[4])
-            amap = _dense_to_map(dense, normal_text, anomaly_text, out_hw=args.image_size)[0].cpu().numpy()
-            amap = gaussian_filter(amap, sigma=args.sigma)
+            amap_batch = _dense_to_map(dense, normal_text, anomaly_text, out_hw=args.image_size).cpu().numpy()
 
-            image_score = float(reduce_anomaly_map(torch.from_numpy(amap).unsqueeze(0), mode="topk_mean", topk_ratio=0.01)[0])
+            for idx in range(amap_batch.shape[0]):
+                amap = gaussian_filter(amap_batch[idx], sigma=args.sigma)
+                image_score = float(
+                    reduce_anomaly_map(
+                        torch.from_numpy(amap).unsqueeze(0),
+                        mode="topk_mean",
+                        topk_ratio=0.01,
+                    )[0]
+                )
 
-            image_gt.append(gt_label)
-            image_scores.append(image_score)
-            pixel_gt.append(mask.flatten())
-            pixel_scores.append(amap.flatten())
+                image_gt.append(int(labels[idx]))
+                image_scores.append(image_score)
+                pixel_gt.append(masks[idx].flatten())
+                pixel_scores.append(amap.flatten())
 
     image_gt_np = np.asarray(image_gt)
     image_scores_np = np.asarray(image_scores)
@@ -131,8 +139,8 @@ def main() -> None:
     image_auroc = roc_auc_score(image_gt_np, image_scores_np)
     pixel_auroc = roc_auc_score(pixel_gt_np, pixel_scores_np)
 
-    image_th = _best_f1_threshold(image_gt_np, image_scores_np)
-    pixel_th = _best_f1_threshold(pixel_gt_np, pixel_scores_np)
+    image_th = _find_best_f1_threshold(image_gt_np, image_scores_np)
+    pixel_th = _find_best_f1_threshold(pixel_gt_np, pixel_scores_np)
 
     image_pred = (image_scores_np >= image_th).astype(np.int32)
     pixel_pred = (pixel_scores_np >= pixel_th).astype(np.int32)
@@ -143,9 +151,9 @@ def main() -> None:
     pixel_f1 = f1_score(pixel_gt_np, pixel_pred, zero_division=0)
 
     # PRO-score
-    masks = np.stack([x.reshape(args.image_size, args.image_size) for x in pixel_gt])
+    masks_reshaped = np.stack([x.reshape(args.image_size, args.image_size) for x in pixel_gt])
     amaps = np.stack([x.reshape(args.image_size, args.image_size) for x in pixel_scores])
-    pro_score = cal_pro_score(masks=masks, amaps=amaps)
+    pro_score = cal_pro_score(masks=masks_reshaped, amaps=amaps)
 
     print("=== Zero-shot Evaluation Results ===")
     print(f"Image-AUROC: {image_auroc:.4f}")

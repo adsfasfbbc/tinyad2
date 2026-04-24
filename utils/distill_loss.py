@@ -28,7 +28,7 @@ class DistillationLoss(nn.Module):
         # tokens: [B, 576, 1024] -> [B, 1024, 24, 24]
         b, n, c = tokens.shape
         if n != hw * hw:
-            raise ValueError(f"Teacher patch token length {n} does not match {hw}x{hw}.")
+            raise ValueError(f"Expected {hw * hw} tokens, got {n}.")
         return tokens.reshape(b, hw, hw, c).permute(0, 3, 1, 2).contiguous()
 
     @staticmethod

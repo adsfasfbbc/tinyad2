@@ -63,12 +63,12 @@ class VMambaStudent(nn.Module):
             from vmamba import build_vmamba_small  # type: ignore
 
             model = build_vmamba_small(pretrained=pretrained)
-        except Exception:
+        except (ImportError, ModuleNotFoundError, AttributeError):
             try:
                 from vmamba.models.vmamba import VMamba  # type: ignore
 
                 model = VMamba(variant="small", pretrained=pretrained)
-            except Exception:
+            except (ImportError, ModuleNotFoundError, AttributeError):
                 if not use_fallback_if_unavailable:
                     raise RuntimeError(
                         "VMamba-Small implementation not found. Install VMamba package or set fallback enabled."
@@ -102,7 +102,9 @@ class VMambaStudent(nn.Module):
         if isinstance(out, (list, tuple)) and len(out) >= 4:
             return {i + 1: out[i] for i in range(4)}
 
-        raise RuntimeError("Unable to parse VMamba stage outputs.")
+        raise RuntimeError(
+            f"Unable to parse VMamba stage outputs from type={type(out)}."
+        )
 
     def forward(self, images: torch.Tensor) -> StudentOutput:
         stages = self._extract_vmamba_stages(images)

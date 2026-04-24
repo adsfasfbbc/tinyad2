@@ -107,6 +107,7 @@ def main() -> None:
 
     step = 0
     for epoch in range(args.epochs):
+        nan_skip_count = 0
         student.train()
         adapter.train()
 
@@ -126,6 +127,9 @@ def main() -> None:
                 total_loss = losses["loss_total"]
 
                 if torch.isnan(total_loss) or torch.isinf(total_loss):
+                    nan_skip_count += 1
+                    if nan_skip_count % 10 == 1:
+                        print(f"[warn] Skipping NaN/Inf loss batch. Total skipped: {nan_skip_count}")
                     continue
 
             scaler.scale(total_loss).backward()
@@ -144,6 +148,8 @@ def main() -> None:
                         "train/epoch": epoch,
                     }
                 )
+
+        print(f"[epoch {epoch + 1}] skipped_nan_inf_batches={nan_skip_count}")
 
         ckpt = {
             "epoch": epoch + 1,

@@ -28,7 +28,7 @@ class OpenCLIPTeacher(nn.Module):
             import open_clip
         except ImportError as exc:
             raise ImportError(
-                "open_clip_torch is required for OpenCLIPTeacher. Install open_clip_torch first."
+                "open_clip_torch is required for OpenCLIPTeacher. Install with: pip install 'open_clip_torch>=2.24.0'."
             ) from exc
 
         self.layers: List[int] = sorted({int(l) for l in layers})
