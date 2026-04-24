@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import time
+from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -158,6 +160,56 @@ def _gaussian_smooth_anomaly_map(anomaly_map: torch.Tensor, kernel_size: int = 3
     raise ValueError(f"anomaly_map must be 3D or 4D, got {tuple(anomaly_map.shape)}")
 
 
+def _normalize_anomaly_map_zscore(anomaly_map: torch.Tensor, mean: float, std: float, eps: float = 1e-6) -> torch.Tensor:
+    return (anomaly_map - float(mean)) / max(float(std), float(eps))
+
+
+@torch.no_grad()
+def _compute_train_normal_anomaly_stats(
+    teacher: torch.nn.Module,
+    student: torch.nn.Module,
+    dispatcher: torch.nn.Module,
+    train_loader: torch.utils.data.DataLoader,
+    image_size: int,
+) -> Dict[str, Dict[str, float]]:
+    stats = defaultdict(lambda: {"sum": 0.0, "sq_sum": 0.0, "count": 0})
+
+    for images, _, labels, cls_names, _ in train_loader:
+        images = images.to(next(student.parameters()).device, non_blocking=True)
+        labels = labels.float()
+        t_out = teacher(images)
+        s_out = student(images)
+        amap = dispatcher.anomaly_map(_teacher_to_dict(t_out), s_out, image_size=image_size)
+        amap = torch.nan_to_num(amap, nan=0.0, posinf=0.0, neginf=0.0).detach().cpu()
+
+        for i in range(amap.shape[0]):
+            if float(labels[i].item()) != 0.0:
+                continue
+            cls_name = str(cls_names[i])
+            vals = amap[i].reshape(-1)
+            v_sum = float(vals.sum().item())
+            v_sq_sum = float((vals * vals).sum().item())
+            v_count = int(vals.numel())
+            stats[cls_name]["sum"] += v_sum
+            stats[cls_name]["sq_sum"] += v_sq_sum
+            stats[cls_name]["count"] += v_count
+            stats["__global__"]["sum"] += v_sum
+            stats["__global__"]["sq_sum"] += v_sq_sum
+            stats["__global__"]["count"] += v_count
+
+    out: Dict[str, Dict[str, float]] = {}
+    for k, v in stats.items():
+        cnt = int(v["count"])
+        if cnt <= 0:
+            continue
+        mean = float(v["sum"] / cnt)
+        var = max(float(v["sq_sum"] / cnt) - mean * mean, 0.0)
+        out[k] = {"mean": mean, "std": max(float(math.sqrt(var)), 1e-6), "count": float(cnt)}
+    if "__global__" not in out:
+        raise ValueError("No normal samples found in train set for Z-score statistics.")
+    return out
+
+
 @torch.no_grad()
 def evaluate(
     config: Dict,
@@ -203,6 +255,26 @@ def evaluate(
 
     t_args = argparse.Namespace(image_size=image_size)
     preprocess, target_transform = get_transform(t_args)
+    train_set = UnifiedMVTecDataset(
+        root=dataset_root,
+        transform=preprocess,
+        target_transform=target_transform,
+        mode="train",
+        category=category,
+        synth_prob=0.0,
+    )
+    train_loader = torch.utils.data.DataLoader(
+        train_set,
+        batch_size=max(1, int(runtime.get("batch_size", 8))),
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=(device.type == "cuda"),
+    )
+    normal_stats = _compute_train_normal_anomaly_stats(teacher, student, dispatcher, train_loader, image_size=image_size)
+    stats_path = save_dir / "normal_map_stats.json"
+    with stats_path.open("w", encoding="utf-8") as f:
+        json.dump(normal_stats, f, ensure_ascii=False, indent=2)
+
     test_set = UnifiedMVTecDataset(
         root=dataset_root,
         transform=preprocess,
@@ -234,6 +306,10 @@ def evaluate(
         s_out = student(images)
         amap = dispatcher.anomaly_map(_teacher_to_dict(t_out), s_out, image_size=image_size)
         amap = torch.nan_to_num(amap, nan=0.0, posinf=0.0, neginf=0.0)
+        for i in range(amap.shape[0]):
+            cls_key = str(cls_names[i])
+            cls_stat = normal_stats.get(cls_key, normal_stats["__global__"])
+            amap[i] = _normalize_anomaly_map_zscore(amap[i], mean=cls_stat["mean"], std=cls_stat["std"])
 
         amap_for_image = _gaussian_smooth_anomaly_map(amap, kernel_size=image_blur_kernel, sigma=image_blur_sigma)
         img_score = _reduce_anomaly_map_topk(amap_for_image, k=image_topk)
