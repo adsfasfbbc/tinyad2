@@ -18,7 +18,7 @@ from benchmark_ad.distillation import HeterogeneousDistillationDispatcher
 from benchmark_ad.models import VisualADTeacherViTL14, build_student
 from utils.transforms import get_transform
 
-ZSCORE_EPS = 1e-6
+ZSCORE_STD_MIN = 1e-6
 
 
 def load_yaml(path: str) -> Dict:
@@ -162,8 +162,20 @@ def _gaussian_smooth_anomaly_map(anomaly_map: torch.Tensor, kernel_size: int = 3
     raise ValueError(f"anomaly_map must be 3D or 4D, got {tuple(anomaly_map.shape)}")
 
 
-def _normalize_anomaly_map_zscore(anomaly_map: torch.Tensor, mean: float, std: float, eps: float = ZSCORE_EPS) -> torch.Tensor:
-    """Apply element-wise Z-score normalization to an anomaly map tensor."""
+def _normalize_anomaly_map_zscore(
+    anomaly_map: torch.Tensor, mean: float, std: float, eps: float = ZSCORE_STD_MIN
+) -> torch.Tensor:
+    """Apply element-wise Z-score normalization.
+
+    Args:
+        anomaly_map: Input anomaly map tensor.
+        mean: Mean value estimated from normal training samples.
+        std: Standard deviation estimated from normal training samples.
+        eps: Minimum std clamp for numerical stability.
+
+    Returns:
+        Normalized anomaly map tensor with the same shape as input.
+    """
     return (anomaly_map - float(mean)) / max(float(std), float(eps))
 
 
@@ -207,9 +219,12 @@ def _compute_train_normal_anomaly_stats(
             continue
         mean = float(v["sum"] / cnt)
         var = max(float(v["sq_sum"] / cnt) - mean * mean, 0.0)
-        out[k] = {"mean": mean, "std": max(float(math.sqrt(var)), ZSCORE_EPS), "count": float(cnt)}
+        out[k] = {"mean": mean, "std": max(float(math.sqrt(var)), ZSCORE_STD_MIN), "count": float(cnt)}
     if "__global__" not in out:
-        raise ValueError("No normal samples found in train set for Z-score statistics.")
+        raise ValueError(
+            "Failed to compute Z-score statistics: no normal samples (label==0) found in training set. "
+            "Ensure training data contains normal samples for class-wise normalization."
+        )
     return out
 
 
@@ -278,7 +293,7 @@ def evaluate(
     with stats_path.open("w", encoding="utf-8") as f:
         json.dump(normal_stats, f, ensure_ascii=False, indent=2)
     if "__global__" not in normal_stats:
-        raise ValueError("normal_map_stats missing '__global__' entry; cannot run Z-score normalization.")
+        raise ValueError("Internal error: normal_map_stats missing required __global__ entry after successful computation.")
 
     test_set = UnifiedMVTecDataset(
         root=dataset_root,
@@ -314,7 +329,9 @@ def evaluate(
         for i in range(amap.shape[0]):
             cls_key = str(cls_names[i])
             cls_stat = normal_stats.get(cls_key, normal_stats["__global__"])
-            amap[i] = _normalize_anomaly_map_zscore(amap[i], mean=cls_stat["mean"], std=cls_stat["std"], eps=ZSCORE_EPS)
+            amap[i] = _normalize_anomaly_map_zscore(
+                amap[i], mean=cls_stat["mean"], std=cls_stat["std"], eps=ZSCORE_STD_MIN
+            )
 
         amap_for_image = _gaussian_smooth_anomaly_map(amap, kernel_size=image_blur_kernel, sigma=image_blur_sigma)
         img_score = _reduce_anomaly_map_topk(amap_for_image, k=image_topk)
