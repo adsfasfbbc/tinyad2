@@ -219,7 +219,7 @@ def _compute_train_normal_anomaly_stats(
             continue
         mean = float(v["sum"] / cnt)
         var = max(float(v["sq_sum"] / cnt) - mean * mean, 0.0)
-        out[k] = {"mean": mean, "std": max(float(math.sqrt(var)), ZSCORE_STD_MIN), "count": float(cnt)}
+        out[k] = {"mean": mean, "std": max(float(math.sqrt(var)), ZSCORE_STD_MIN), "count": cnt}
     if "__global__" not in out:
         raise ValueError(
             "Failed to compute Z-score statistics: no normal samples (label==0) found in training set. "
@@ -292,8 +292,6 @@ def evaluate(
     stats_path = save_dir / "normal_map_stats.json"
     with stats_path.open("w", encoding="utf-8") as f:
         json.dump(normal_stats, f, ensure_ascii=False, indent=2)
-    if "__global__" not in normal_stats:
-        raise ValueError("Internal error: normal_map_stats missing required __global__ entry after successful computation.")
 
     test_set = UnifiedMVTecDataset(
         root=dataset_root,
