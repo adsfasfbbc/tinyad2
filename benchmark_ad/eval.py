@@ -134,6 +134,16 @@ def _reduce_anomaly_map_topk(anomaly_map: torch.Tensor, k: int = 100) -> torch.T
 
 
 def _gaussian_smooth_anomaly_map(anomaly_map: torch.Tensor, kernel_size: int = 33, sigma: float = 4.0) -> torch.Tensor:
+    """Apply torchvision Gaussian blur to anomaly maps before image-level scoring.
+
+    Args:
+        anomaly_map: Tensor with shape [B, H, W] or [B, C, H, W].
+        kernel_size: Gaussian kernel size; values <= 1 disable smoothing.
+        sigma: Gaussian sigma; values <= 0 disable smoothing.
+
+    Returns:
+        Smoothed tensor with the same shape as input.
+    """
     if float(sigma) <= 0.0 or int(kernel_size) <= 1:
         return anomaly_map
     k = int(kernel_size)
