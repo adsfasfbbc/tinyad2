@@ -147,12 +147,13 @@ def _gaussian_smooth_anomaly_map(anomaly_map: torch.Tensor, kernel_size: int = 3
     if float(sigma) <= 0.0 or int(kernel_size) <= 1:
         return anomaly_map
     k = int(kernel_size)
+    s = float(sigma)
     if k % 2 == 0:
         k += 1
     if anomaly_map.dim() == 3:
-        return tvf.gaussian_blur(anomaly_map.unsqueeze(1), kernel_size=[k, k], sigma=[float(sigma), float(sigma)]).squeeze(1)
+        return tvf.gaussian_blur(anomaly_map.unsqueeze(1), kernel_size=[k, k], sigma=[s, s]).squeeze(1)
     if anomaly_map.dim() == 4:
-        return tvf.gaussian_blur(anomaly_map, kernel_size=[k, k], sigma=[float(sigma), float(sigma)])
+        return tvf.gaussian_blur(anomaly_map, kernel_size=[k, k], sigma=[s, s])
     raise ValueError(f"anomaly_map must be 3D or 4D, got {tuple(anomaly_map.shape)}")
 
 
