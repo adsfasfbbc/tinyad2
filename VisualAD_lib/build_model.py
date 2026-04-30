@@ -29,7 +29,7 @@ def build_model(name: str, state_dict: dict, design_details=None, drop_text_enco
             embed_dim = state_dict["visual.proj"].shape[1]
         else:
             raise RuntimeError(
-                "Unable to infer embed_dim from weights; provide embed_dim in the backbone config."
+                "Unable to infer embed_dim from weights; provide embed_dim via design_details or backbone config."
             )
 
     has_text = all(

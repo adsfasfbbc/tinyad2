@@ -191,5 +191,8 @@ def load_backbone_settings_from_config(
     return entry
 
 
-def is_tinyclip_name(backbone: Optional[str]) -> bool:
+DEFAULT_IMAGE_SIZE = 336
+
+
+def is_tinyclip(backbone: Optional[str]) -> bool:
     return bool(backbone) and backbone.lower().startswith("tinyclip")

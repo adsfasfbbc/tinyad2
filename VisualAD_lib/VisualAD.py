@@ -242,7 +242,7 @@ class VisualAD(nn.Module):
             nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
             
     def build_attention_mask(self):
-        if self.context_length == 0:
+        if not self.use_text:
             return torch.empty(0, 0)
         mask = torch.empty(self.context_length, self.context_length)
         mask.fill_(float("-inf"))
