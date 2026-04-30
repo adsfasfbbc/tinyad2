@@ -178,7 +178,8 @@ class VisualAD(nn.Module):
                  vocab_size: int,
                  transformer_width: int,
                  transformer_heads: int,
-                 transformer_layers: int
+                 transformer_layers: int,
+                 use_text: bool = True,
                  ):
         super().__init__()
 
@@ -194,24 +195,36 @@ class VisualAD(nn.Module):
         )
 
         # Text components - kept for weight loading compatibility but not used in forward
-        self.context_length = context_length
-        self.vocab_size = vocab_size
-        self.transformer = Transformer(
-            width=transformer_width,
-            layers=transformer_layers,
-            heads=transformer_heads,
-            attn_mask=self.build_attention_mask(), 
-            text_layer=True
-        )
-        self.token_embedding = nn.Embedding(vocab_size, transformer_width)
-        self.positional_embedding = nn.Parameter(torch.empty(self.context_length, transformer_width))
-        self.ln_final = LayerNorm(transformer_width)
-        self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
-        self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
-
-        self.initialize_parameters()
+        self.use_text = use_text
+        if use_text:
+            self.context_length = context_length
+            self.vocab_size = vocab_size
+            self.transformer = Transformer(
+                width=transformer_width,
+                layers=transformer_layers,
+                heads=transformer_heads,
+                attn_mask=self.build_attention_mask(),
+                text_layer=True
+            )
+            self.token_embedding = nn.Embedding(vocab_size, transformer_width)
+            self.positional_embedding = nn.Parameter(torch.empty(self.context_length, transformer_width))
+            self.ln_final = LayerNorm(transformer_width)
+            self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
+            self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
+            self.initialize_parameters()
+        else:
+            self.context_length = 0
+            self.vocab_size = 0
+            self.transformer = None
+            self.token_embedding = None
+            self.positional_embedding = None
+            self.ln_final = None
+            self.text_projection = None
+            self.logit_scale = None
 
     def initialize_parameters(self):
+        if not self.use_text:
+            return
         nn.init.normal_(self.token_embedding.weight, std=0.02)
         nn.init.normal_(self.positional_embedding, std=0.01)
 
@@ -228,10 +241,28 @@ class VisualAD(nn.Module):
             nn.init.normal_(self.text_projection, std=self.transformer.width ** -0.5)
             
     def build_attention_mask(self):
+        if self.context_length == 0:
+            return torch.empty(0, 0)
         mask = torch.empty(self.context_length, self.context_length)
         mask.fill_(float("-inf"))
         mask.triu_(1)  # zero out the lower diagonal
         return mask
+
+    def drop_text_encoder(self):
+        """Remove text encoder modules to reduce memory footprint."""
+        for name in [
+            "transformer",
+            "token_embedding",
+            "positional_embedding",
+            "ln_final",
+            "text_projection",
+            "logit_scale",
+        ]:
+            if hasattr(self, name):
+                setattr(self, name, None)
+        self.context_length = 0
+        self.vocab_size = 0
+        self.use_text = False
 
     @property
     def dtype(self):

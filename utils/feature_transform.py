@@ -185,7 +185,7 @@ class LeakyReLUTransform(nn.Module):
         return self.transform(x)
 
 
-def create_feature_transform(transform_type="linear", input_dim=1024, hidden_dim=None, output_dim=None, dropout=0.1, negative_slope=0.01):
+def create_feature_transform(transform_type="linear", input_dim=None, hidden_dim=None, output_dim=None, dropout=0.1, negative_slope=0.01):
     """
     Factory function to create feature transformation modules
 
@@ -200,6 +200,8 @@ def create_feature_transform(transform_type="linear", input_dim=1024, hidden_dim
     Returns:
         Feature transformation module
     """
+    if input_dim is None:
+        raise ValueError("input_dim must be provided to create feature transforms")
     if transform_type == "linear":
         return SimpleLinearTransform(input_dim, output_dim, dropout)
     elif transform_type == "mlp":

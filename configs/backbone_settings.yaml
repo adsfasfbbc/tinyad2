@@ -1,0 +1,31 @@
+ViT-L/14@336px:
+  weights: https://openaipublic.azureedge.net/clip/models/3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02/ViT-L-14-336px.pt
+  image_size: 336
+  embed_dim: 1024
+  transformer_layers: 24
+  layers: [6, 12, 18, 24]
+  drop_text_encoder: false
+
+TinyCLIP-ViT-L/14@336px:
+  weights: ""
+  image_size: 336
+  embed_dim: 512
+  transformer_layers: 12
+  layers: [3, 6, 9, 12]
+  drop_text_encoder: true
+
+TinyCLIP-ViT-L/14@336px-640:
+  weights: ""
+  image_size: 336
+  embed_dim: 640
+  transformer_layers: 12
+  layers: [3, 6, 9, 12]
+  drop_text_encoder: true
+
+TinyCLIP-ViT-L/14@336px-24L:
+  weights: ""
+  image_size: 336
+  embed_dim: 640
+  transformer_layers: 24
+  layers: [6, 12, 18, 24]
+  drop_text_encoder: true

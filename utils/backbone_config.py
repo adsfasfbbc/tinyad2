@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable, List, Optional, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 
 import numpy as np
 import yaml
@@ -152,3 +152,40 @@ def load_feature_layers_from_config(
     _log(logger, "info", f"Loaded feature layers {layers} for backbone {backbone} from {config_path}.")
     return layers
 
+
+def load_backbone_settings_from_config(
+    config_path: Optional[str],
+    backbone: str,
+    logger=None,
+) -> Dict[str, object]:
+    """Load backbone settings (e.g., embed_dim, image_size) from a YAML config."""
+
+    if not config_path:
+        return {}
+
+    if not os.path.exists(config_path):
+        _log(
+            logger,
+            "warning",
+            f"Backbone config file not found at {config_path}; skipping config defaults.",
+        )
+        return {}
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as fp:
+            config_data = yaml.safe_load(fp) or {}
+    except yaml.YAMLError as exc:
+        _log(logger, "error", f"Failed to parse backbone config {config_path}: {exc}")
+        raise
+
+    entry = config_data.get(backbone)
+    if not isinstance(entry, dict):
+        _log(
+            logger,
+            "info",
+            f"No backbone settings configured for {backbone} in {config_path}; skipping config defaults.",
+        )
+        return {}
+
+    _log(logger, "info", f"Loaded backbone settings for {backbone} from {config_path}.")
+    return entry

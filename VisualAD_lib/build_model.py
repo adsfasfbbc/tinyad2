@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from .VisualAD import VisualAD
 
-def build_model(name: str, state_dict: dict, design_details = None):
+def build_model(name: str, state_dict: dict, design_details=None, drop_text_encoder: bool = False):
     vit = "visual.proj" in state_dict
     
     if vit:
@@ -20,18 +20,39 @@ def build_model(name: str, state_dict: dict, design_details = None):
         assert output_width ** 2 + 1 == state_dict["visual.attnpool.positional_embedding"].shape[0]
         image_resolution = output_width * 32
 
-    embed_dim = state_dict["text_projection"].shape[1]
-    context_length = state_dict["positional_embedding"].shape[0]
-    vocab_size = state_dict["token_embedding.weight"].shape[0]
-    transformer_width = state_dict["ln_final.weight"].shape[0]
-    transformer_heads = transformer_width // 64
-    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))
+    design_details = design_details or {}
+    embed_dim = design_details.get("embed_dim")
+    if embed_dim is None:
+        if "text_projection" in state_dict:
+            embed_dim = state_dict["text_projection"].shape[1]
+        elif "visual.proj" in state_dict:
+            embed_dim = state_dict["visual.proj"].shape[1]
+        else:
+            embed_dim = vision_width
+
+    has_text = all(
+        key in state_dict
+        for key in [
+            "text_projection",
+            "positional_embedding",
+            "token_embedding.weight",
+            "ln_final.weight",
+        ]
+    )
+    use_text = has_text and not drop_text_encoder
+
+    context_length = state_dict["positional_embedding"].shape[0] if has_text else 0
+    vocab_size = state_dict["token_embedding.weight"].shape[0] if has_text else 0
+    transformer_width = state_dict["ln_final.weight"].shape[0] if has_text else 0
+    transformer_heads = transformer_width // 64 if has_text else 0
+    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith("transformer.resblocks"))) if has_text else 0
     
     # Always use VisualAD for token-aware anomaly detection
     model = VisualAD(
         embed_dim,
         image_resolution, vision_layers, vision_width, vision_patch_size,
-        context_length, vocab_size, transformer_width, transformer_heads, transformer_layers
+        context_length, vocab_size, transformer_width, transformer_heads, transformer_layers,
+        use_text=use_text,
     )
 
     # Remove our custom tokens from expected state_dict if they exist
@@ -61,4 +82,6 @@ def build_model(name: str, state_dict: dict, design_details = None):
 
 
     model.load_state_dict(state_dict, strict=False)  # Use strict=False to allow missing keys
+    if drop_text_encoder and model.use_text:
+        model.drop_text_encoder()
     return model.eval()

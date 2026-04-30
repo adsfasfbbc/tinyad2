@@ -17,6 +17,11 @@ import os
 import random
 from utils.transforms import get_transform
 from utils.scoring import reduce_anomaly_map, DEFAULT_TOPK_RATIO
+from utils.backbone_config import (
+    load_backbone_settings_from_config,
+    load_feature_layers_from_config,
+    resolve_features_list,
+)
 torch.use_deterministic_algorithms(True,warn_only=False)
 def setup_seed(seed):
     torch.manual_seed(seed)
@@ -31,6 +36,28 @@ def setup_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
 
+def apply_backbone_config(args, logger):
+    config_path = args.backbone_config or args.feature_config
+    settings = load_backbone_settings_from_config(config_path, args.backbone, logger)
+
+    if settings:
+        if args.backbone_weights is None:
+            args.backbone_weights = settings.get("weights") or None
+        if args.image_size is None:
+            args.image_size = settings.get("image_size")
+        if args.embed_dim is None:
+            args.embed_dim = settings.get("embed_dim")
+        if args.transformer_layers is None:
+            args.transformer_layers = settings.get("transformer_layers")
+        if not args.features_list:
+            args.features_list = settings.get("layers")
+        if args.drop_text_encoder is None:
+            args.drop_text_encoder = settings.get("drop_text_encoder")
+
+    if args.image_size is None:
+        args.image_size = 336
+    if args.drop_text_encoder is None:
+        args.drop_text_encoder = "tinyclip" in args.backbone.lower()
 
 def generate_anomaly_map_from_tokens(anomaly_features, normal_features, patch_tokens, image_size):
     """
@@ -117,15 +144,34 @@ def train(args):
     logger = get_logger(args.save_path)
     device = args.device
 
+    apply_backbone_config(args, logger)
+
     # Load and setup model
     try:
-        model, _ = VisualAD_lib.load(args.backbone, device=device)
+        model, _ = VisualAD_lib.load(
+            args.backbone,
+            device=device,
+            design_details={"embed_dim": args.embed_dim},
+            weights_override=args.backbone_weights,
+            drop_text_encoder=args.drop_text_encoder,
+        )
     except RuntimeError as exc:
         logger.error(f"Failed to load backbone {args.backbone}: {exc}")
         raise
 
     model.train()
     model.to(device)
+
+    total_layers = getattr(model.visual.transformer, "layers", 0)
+    config_layers = load_feature_layers_from_config(
+        args.feature_config or args.backbone_config,
+        args.backbone,
+        logger,
+    )
+    requested_layers = args.features_list if args.features_list else config_layers
+    args.features_list = resolve_features_list(requested_layers, total_layers, logger)
+    args.embed_dim = model.visual.embed_dim
+    args.transformer_layers = total_layers
 
     preprocess, target_transform = get_transform(args)
 
@@ -153,9 +199,15 @@ def train(args):
     feature_dim = model.visual.embed_dim
     layer_transforms = setup_feature_transforms(args.features_list, device, feature_dim)
 
-    setup_model_training(model)
+    setup_model_training(model, unfreeze_encoder_layers=args.unfreeze_encoder_layers)
 
-    optimizer = create_optimizer(model, layer_transforms, args, cross_attn=cross_attn)
+    optimizer = create_optimizer(
+        model,
+        layer_transforms,
+        args,
+        cross_attn=cross_attn,
+        unfreeze_encoder_layers=args.unfreeze_encoder_layers,
+    )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epoch, eta_min=args.learning_rate * 0.1)
 
     amp_enabled = False
@@ -336,19 +388,31 @@ if __name__ == '__main__':
     parser.add_argument("--save_path", type=str, default='./checkpoints', help='path to save results')
     parser.add_argument("--train_dataset", type=str, default='mvtec', help="train dataset name")
     parser.add_argument("--backbone", type=str, default="ViT-L/14@336px",
-                        choices=VisualAD_lib.available_models(), help="CLIP backbone to use")
-    parser.add_argument("--feature_config", type=str, default=os.path.join('configs', 'backbone_layers.yaml'),
+                        help="CLIP/TinyCLIP backbone name or checkpoint path")
+    parser.add_argument("--backbone_config", type=str, default=os.path.join('configs', 'backbone_settings.yaml'),
+                        help="YAML file specifying backbone settings (weights, layers, embed_dim, image_size)")
+    parser.add_argument("--feature_config", type=str, default=os.path.join('configs', 'backbone_settings.yaml'),
                         help="YAML file specifying default feature layers per backbone")
-    parser.add_argument("--features_list", type=int, nargs="*", default=[6, 12, 18, 24],
+    parser.add_argument("--backbone_weights", type=str, default=None,
+                        help="Override backbone weights path or URL")
+    parser.add_argument("--features_list", type=int, nargs="*", default=None,
                         help="Override feature layers (falls back to YAML config if omitted)")
+    parser.add_argument("--embed_dim", type=int, default=None, help="Override backbone embedding dimension")
+    parser.add_argument("--transformer_layers", type=int, default=None, help="Override backbone transformer depth")
     parser.add_argument("--epoch", type=int, default=15, help="epochs")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="learning rate")
     parser.add_argument("--batch_size", type=int, default=8, help="batch size")
-    parser.add_argument("--image_size", type=int, default=518, help="image size")
+    parser.add_argument("--image_size", type=int, default=None, help="image size")
     parser.add_argument("--print_freq", type=int, default=1, help="print frequency")
     parser.add_argument("--save_freq", type=int, default=1, help="save frequency")
     parser.add_argument("--seed", type=int, default=111, help="random seed")
     parser.add_argument("--device", type=str, default="cuda:1", help="device to use")
+    parser.add_argument("--drop_text_encoder", action="store_true", default=None,
+                        help="Drop text encoder weights to save memory")
+    parser.add_argument("--unfreeze_encoder_layers", type=int, default=0,
+                        help="Unfreeze last N vision transformer blocks for fine-tuning")
+    parser.add_argument("--encoder_learning_rate", type=float, default=1e-5,
+                        help="Learning rate for unfrozen vision encoder blocks")
 
     args = parser.parse_args()
     setup_seed(args.seed)

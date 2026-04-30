@@ -10,7 +10,8 @@ def print_training_parameters(args, logger):
     """Print all training parameters before starting training"""
     logger.info(f"Training: {args.train_dataset} | Backbone: {args.backbone} | "
                 f"Epochs: {args.epoch} | BS: {args.batch_size} | LR: {args.learning_rate} | "
-                f"Image: {args.image_size} | Layers: {args.features_list}")
+                f"Image: {args.image_size} | Layers: {args.features_list} | "
+                f"Unfreeze: {args.unfreeze_encoder_layers} | Encoder LR: {args.encoder_learning_rate}")
 
 
 def validate_training_setup(args, model, device, logger):
@@ -30,7 +31,7 @@ def validate_training_setup(args, model, device, logger):
         raise FileNotFoundError(f"Training data path does not exist: {args.train_data_path}")
 
 
-def setup_model_training(model):
+def setup_model_training(model, unfreeze_encoder_layers: int = 0):
     """Configure model parameters for training"""
     for param in model.parameters():
         param.requires_grad = False
@@ -43,8 +44,15 @@ def setup_model_training(model):
         ln_post.weight.requires_grad = True
         ln_post.bias.requires_grad = True
 
+    if unfreeze_encoder_layers > 0:
+        blocks = getattr(model.visual.transformer, "resblocks", [])
+        num_blocks = len(blocks)
+        for block in blocks[max(0, num_blocks - unfreeze_encoder_layers):]:
+            for param in block.parameters():
+                param.requires_grad = True
 
-def create_optimizer(model, layer_transforms, args, cross_attn=None):
+
+def create_optimizer(model, layer_transforms, args, cross_attn=None, unfreeze_encoder_layers: int = 0):
     """Create optimizer with different learning rates for different components"""
     optimizer_params = [
         {'params': [model.visual.anomaly_token], 'lr': args.learning_rate, 'weight_decay': 0.01},
@@ -72,6 +80,19 @@ def create_optimizer(model, layer_transforms, args, cross_attn=None):
             'lr': args.learning_rate * 0.1,
             'weight_decay': 0.01
         })
+
+    if unfreeze_encoder_layers > 0:
+        blocks = getattr(model.visual.transformer, "resblocks", [])
+        num_blocks = len(blocks)
+        encoder_params = []
+        for block in blocks[max(0, num_blocks - unfreeze_encoder_layers):]:
+            encoder_params.extend(list(block.parameters()))
+        if encoder_params:
+            optimizer_params.append({
+                'params': encoder_params,
+                'lr': args.encoder_learning_rate,
+                'weight_decay': 0.01
+            })
 
     return torch.optim.AdamW(optimizer_params, betas=(0.9, 0.999))
 

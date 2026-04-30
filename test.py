@@ -16,6 +16,11 @@ from utils.feature_transform import create_feature_transform
 from utils.analysis import get_classification_from_segmentation, analyze_classification_distribution
 from utils.visualization import visualize_anomaly_results
 from utils.anomaly_detection import generate_anomaly_map_from_tokens
+from utils.backbone_config import (
+    load_backbone_settings_from_config,
+    load_feature_layers_from_config,
+    resolve_features_list,
+)
 
 
 def setup_seed(seed):
@@ -28,6 +33,28 @@ def setup_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
 
+def apply_backbone_config(args, logger):
+    config_path = args.backbone_config
+    settings = load_backbone_settings_from_config(config_path, args.backbone, logger)
+
+    if settings:
+        if args.backbone_weights is None:
+            args.backbone_weights = settings.get("weights") or None
+        if args.image_size is None:
+            args.image_size = settings.get("image_size")
+        if args.embed_dim is None:
+            args.embed_dim = settings.get("embed_dim")
+        if args.transformer_layers is None:
+            args.transformer_layers = settings.get("transformer_layers")
+        if not args.features_list:
+            args.features_list = settings.get("layers")
+        if args.drop_text_encoder is None:
+            args.drop_text_encoder = settings.get("drop_text_encoder")
+
+    if args.image_size is None:
+        args.image_size = 336
+    if args.drop_text_encoder is None:
+        args.drop_text_encoder = "tinyclip" in args.backbone.lower()
 
 def test(args):
     logger = get_logger(args.save_path)
@@ -37,18 +64,40 @@ def test(args):
     checkpoint = torch.load(args.checkpoint_path, map_location=device)
 
     # Use checkpoint values
-    args.backbone = checkpoint.get("backbone", "ViT-L/14@336px")
-    args.image_size = checkpoint.get("image_size", 518)
-    args.features_list = checkpoint.get("features_list", [6, 12, 18, 24])
+    if args.backbone is None:
+        args.backbone = checkpoint.get("backbone", "ViT-L/14@336px")
+    if args.image_size is None:
+        args.image_size = checkpoint.get("image_size")
+    if not args.features_list:
+        args.features_list = checkpoint.get("features_list")
+
+    apply_backbone_config(args, logger)
 
     preprocess, target_transform = get_transform(args)
 
     # Load model
-    model, _ = VisualAD_lib.load(args.backbone, device=device)
+    model, _ = VisualAD_lib.load(
+        args.backbone,
+        device=device,
+        design_details={"embed_dim": args.embed_dim},
+        weights_override=args.backbone_weights,
+        drop_text_encoder=args.drop_text_encoder,
+    )
     model.eval()
     model.to(device)
 
     feature_dim = model.visual.embed_dim
+
+    total_layers = getattr(model.visual.transformer, "layers", 0)
+    config_layers = load_feature_layers_from_config(
+        args.backbone_config,
+        args.backbone,
+        logger,
+    )
+    requested_layers = args.features_list if args.features_list else config_layers
+    args.features_list = resolve_features_list(requested_layers, total_layers, logger)
+    args.embed_dim = feature_dim
+    args.transformer_layers = total_layers
 
     # Load trained tokens
     model.visual.anomaly_token.data = checkpoint["anomaly_token"].to(device)
@@ -81,7 +130,7 @@ def test(args):
             dropout=config.get("dropout", 0.1),
             res_scale_init=config.get("res_scale_init", 0.01)
         ).to(device)
-        cross_attn.load_state_dict(checkpoint["cross_attn"])
+        cross_attn.load_state_dict(checkpoint["cross_attn"], strict=False)
         cross_attn.eval()
 
     # Test dataset
@@ -180,6 +229,18 @@ if __name__ == '__main__':
     parser.add_argument("--checkpoint_path", type=str, required=True, help="path to trained model checkpoint")
     parser.add_argument("--sigma", type=int, default=4, help="gaussian filter sigma")
     parser.add_argument("--device", type=str, default="cuda:1", help="device to use")
+    parser.add_argument("--backbone", type=str, default=None, help="Override backbone name")
+    parser.add_argument("--backbone_config", type=str, default=os.path.join('configs', 'backbone_settings.yaml'),
+                        help="YAML file specifying backbone settings")
+    parser.add_argument("--backbone_weights", type=str, default=None,
+                        help="Override backbone weights path or URL")
+    parser.add_argument("--features_list", type=int, nargs="*", default=None,
+                        help="Override feature layers")
+    parser.add_argument("--embed_dim", type=int, default=None, help="Override backbone embedding dimension")
+    parser.add_argument("--transformer_layers", type=int, default=None, help="Override backbone transformer depth")
+    parser.add_argument("--image_size", type=int, default=None, help="image size")
+    parser.add_argument("--drop_text_encoder", action="store_true", default=None,
+                        help="Drop text encoder weights to save memory")
     parser.add_argument("--enable_analysis", action="store_true", help="enable data analysis and visualization")
     parser.add_argument("--seed", type=int, default=42, help="random seed")
 

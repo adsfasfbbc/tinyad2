@@ -19,8 +19,8 @@ if packaging.version.parse(torch.__version__) < packaging.version.parse("1.7.1")
     warnings.warn("PyTorch version 1.7.1 or higher is recommended")
 
 
-__all__ = ["available_models", "load", 
-           "get_similarity_map",  "compute_similarity"]
+__all__ = ["available_models", "load",
+           "get_similarity_map", "compute_similarity"]
 _tokenizer = _Tokenizer()
 
 _MODELS = {
@@ -80,6 +80,10 @@ def _download(
     return download_target
 
 
+def _is_url(path_or_url: str) -> bool:
+    return isinstance(path_or_url, str) and path_or_url.startswith(("http://", "https://"))
+
+
 def _convert_image_to_rgb(image):
     return image.convert("RGB")
 
@@ -119,7 +123,15 @@ def load_checkpoint(model, checkpoint_path, strict=True):
     incompatible_keys = model.load_state_dict(state_dict, strict=strict)
     return incompatible_keys
 
-def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", design_details = None, jit: bool = False, download_root: str = None):
+def load(
+    name: str,
+    device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu",
+    design_details=None,
+    jit: bool = False,
+    download_root: str = None,
+    weights_override: str = None,
+    drop_text_encoder: bool = False,
+):
     """Load a CLIP model
 
     Parameters
@@ -145,7 +157,14 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
         A torchvision transform that converts a PIL image into a tensor that the returned model can take as its input
     """
     print("name", name)
-    if name in _MODELS:
+    if weights_override:
+        if _is_url(weights_override):
+            model_path = _download(weights_override, download_root or os.path.expanduser("~/.cache/clip"))
+        elif os.path.isfile(weights_override):
+            model_path = weights_override
+        else:
+            raise RuntimeError(f"Model weights {weights_override} not found; provide a valid path or URL")
+    elif name in _MODELS:
         model_path = _download(_MODELS[name], download_root or os.path.expanduser("~/.cache/clip"))
         # model_path = _download(_MODELS[name], download_root or os.path.expanduser("/remote-home/iot_zhouqihang/root/.cache/clip"))
     elif os.path.isfile(name):
@@ -166,7 +185,12 @@ def load(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_a
             state_dict = torch.load(opened_file, map_location="cpu")
 
     if not jit:
-        model = build_model(name, state_dict or model.state_dict(), design_details).to(device)
+        model = build_model(
+            name,
+            state_dict or model.state_dict(),
+            design_details,
+            drop_text_encoder=drop_text_encoder,
+        ).to(device)
         if str(device) == "cpu":
             model.float()
         return model, _transform(model.visual.input_resolution)
