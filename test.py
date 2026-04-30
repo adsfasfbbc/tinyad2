@@ -130,7 +130,12 @@ def test(args):
             dropout=config.get("dropout", 0.1),
             res_scale_init=config.get("res_scale_init", 0.01)
         ).to(device)
-        cross_attn.load_state_dict(checkpoint["cross_attn"], strict=False)
+        incompatible = cross_attn.load_state_dict(checkpoint["cross_attn"], strict=False)
+        if incompatible.missing_keys or incompatible.unexpected_keys:
+            logger.warning(
+                f"Cross-attention weights mismatch: missing={incompatible.missing_keys}, "
+                f"unexpected={incompatible.unexpected_keys}"
+            )
         cross_attn.eval()
 
     # Test dataset

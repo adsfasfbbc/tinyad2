@@ -7,7 +7,7 @@ ViT-L/14@336px:
   drop_text_encoder: false
 
 TinyCLIP-ViT-L/14@336px:
-  weights: ""
+  weights: null
   image_size: 336
   embed_dim: 512
   transformer_layers: 12
@@ -15,7 +15,7 @@ TinyCLIP-ViT-L/14@336px:
   drop_text_encoder: true
 
 TinyCLIP-ViT-L/14@336px-640:
-  weights: ""
+  weights: null
   image_size: 336
   embed_dim: 640
   transformer_layers: 12
@@ -23,7 +23,7 @@ TinyCLIP-ViT-L/14@336px-640:
   drop_text_encoder: true
 
 TinyCLIP-ViT-L/14@336px-24L:
-  weights: ""
+  weights: null
   image_size: 336
   embed_dim: 640
   transformer_layers: 24

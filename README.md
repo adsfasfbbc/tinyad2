@@ -4,6 +4,7 @@
 - Default backbone settings live in `configs/backbone_settings.yaml`.
 - Switch to TinyCLIP by name and provide weights via URL or local path:
   - `--backbone TinyCLIP-ViT-L/14@336px --backbone_weights /path/to/tinyclip.pt`
+- TinyCLIP entries in the YAML keep `weights: null`, so `--backbone_weights` is required.
 - The config provides `embed_dim`, `transformer_layers`, `image_size`, and `layers` defaults.
 - CLI overrides are available: `--embed_dim`, `--transformer_layers`, `--image_size`, `--features_list`.
 
