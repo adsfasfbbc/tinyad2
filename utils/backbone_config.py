@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 import numpy as np
 import yaml
 
+DEFAULT_IMAGE_SIZE = 224
 
 def _log(logger, level: str, message: str) -> None:
     if logger is None:
@@ -187,11 +188,9 @@ def load_backbone_settings_from_config(
         )
         return {}
 
+
     _log(logger, "info", f"Loaded backbone settings for {backbone} from {config_path}.")
     return entry
-
-
-DEFAULT_IMAGE_SIZE = 224
 
 
 def is_tinyclip(backbone: Optional[str]) -> bool:
