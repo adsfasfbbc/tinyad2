@@ -57,7 +57,7 @@ def apply_backbone_config(args, logger):
     if args.image_size is None:
         args.image_size = 336
     if args.drop_text_encoder is None:
-        args.drop_text_encoder = args.backbone.lower().startswith("tinyclip")
+        args.drop_text_encoder = bool(args.backbone) and args.backbone.lower().startswith("tinyclip")
 
 def generate_anomaly_map_from_tokens(anomaly_features, normal_features, patch_tokens, image_size):
     """

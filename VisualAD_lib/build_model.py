@@ -1,4 +1,5 @@
 import torch
+import warnings
 from torch import nn
 from .VisualAD import VisualAD
 
@@ -29,6 +30,9 @@ def build_model(name: str, state_dict: dict, design_details=None, drop_text_enco
             embed_dim = state_dict["visual.proj"].shape[1]
         else:
             embed_dim = vision_width
+            warnings.warn(
+                "Falling back to vision_width for embed_dim; provide embed_dim in config for TinyCLIP."
+            )
 
     has_text = all(
         key in state_dict
