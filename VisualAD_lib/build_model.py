@@ -31,7 +31,7 @@ def build_model(name: str, state_dict: dict, design_details=None, drop_text_enco
         else:
             embed_dim = vision_width
             warnings.warn(
-                "Falling back to vision_width for embed_dim; provide embed_dim in config for TinyCLIP."
+                "Falling back to vision_width for embed_dim; provide embed_dim in config to avoid ambiguity."
             )
 
     has_text = all(

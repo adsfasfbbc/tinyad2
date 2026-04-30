@@ -223,6 +223,7 @@ class VisualAD(nn.Module):
             self.logit_scale = None
 
     def initialize_parameters(self):
+        """Initialize text encoder parameters when enabled."""
         if not self.use_text:
             return
         nn.init.normal_(self.token_embedding.weight, std=0.02)

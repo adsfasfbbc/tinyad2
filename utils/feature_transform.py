@@ -201,7 +201,7 @@ def create_feature_transform(transform_type="linear", input_dim=None, hidden_dim
         Feature transformation module
     """
     if input_dim is None:
-        raise ValueError("input_dim must be provided (use model.visual.embed_dim or config embed_dim)")
+        raise ValueError("input_dim must be provided (e.g., model.visual.embed_dim)")
     if transform_type == "linear":
         return SimpleLinearTransform(input_dim, output_dim, dropout)
     elif transform_type == "mlp":

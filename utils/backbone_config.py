@@ -189,3 +189,7 @@ def load_backbone_settings_from_config(
 
     _log(logger, "info", f"Loaded backbone settings for {backbone} from {config_path}.")
     return entry
+
+
+def is_tinyclip_name(backbone: Optional[str]) -> bool:
+    return bool(backbone) and backbone.lower().startswith("tinyclip")
