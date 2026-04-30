@@ -6,6 +6,10 @@ import torch.nn as nn
 from .feature_transform import create_feature_transform
 
 
+def _get_encoder_blocks(model):
+    return list(getattr(model.visual.transformer, "resblocks", []))
+
+
 def print_training_parameters(args, logger):
     """Print all training parameters before starting training"""
     logger.info(f"Training: {args.train_dataset} | Backbone: {args.backbone} | "
@@ -45,7 +49,7 @@ def setup_model_training(model, unfreeze_encoder_layers: int = 0):
         ln_post.bias.requires_grad = True
 
     if unfreeze_encoder_layers > 0:
-        blocks = getattr(model.visual.transformer, "resblocks", [])
+        blocks = _get_encoder_blocks(model)
         num_blocks = len(blocks)
         for block in blocks[max(0, num_blocks - unfreeze_encoder_layers):]:
             for param in block.parameters():
@@ -82,7 +86,7 @@ def create_optimizer(model, layer_transforms, args, cross_attn=None, unfreeze_en
         })
 
     if unfreeze_encoder_layers > 0:
-        blocks = getattr(model.visual.transformer, "resblocks", [])
+        blocks = _get_encoder_blocks(model)
         num_blocks = len(blocks)
         encoder_params = []
         for block in blocks[max(0, num_blocks - unfreeze_encoder_layers):]:

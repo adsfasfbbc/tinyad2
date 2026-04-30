@@ -45,7 +45,12 @@ def build_model(name: str, state_dict: dict, design_details=None, drop_text_enco
     vocab_size = state_dict["token_embedding.weight"].shape[0] if has_text else 0
     transformer_width = state_dict["ln_final.weight"].shape[0] if has_text else 0
     transformer_heads = transformer_width // 64 if has_text else 0
-    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith("transformer.resblocks"))) if has_text else 0
+    if has_text:
+        transformer_layers = len(
+            set(k.split(".")[2] for k in state_dict if k.startswith("transformer.resblocks"))
+        )
+    else:
+        transformer_layers = 0
     
     # Always use VisualAD for token-aware anomaly detection
     model = VisualAD(
