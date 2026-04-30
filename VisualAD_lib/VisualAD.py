@@ -243,7 +243,7 @@ class VisualAD(nn.Module):
             
     def build_attention_mask(self):
         if self.context_length == 0:
-            return None
+            return torch.empty(0, 0)
         mask = torch.empty(self.context_length, self.context_length)
         mask.fill_(float("-inf"))
         mask.triu_(1)  # zero out the lower diagonal

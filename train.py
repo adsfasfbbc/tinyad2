@@ -408,7 +408,7 @@ if __name__ == '__main__':
     parser.add_argument("--save_freq", type=int, default=1, help="save frequency")
     parser.add_argument("--seed", type=int, default=111, help="random seed")
     parser.add_argument("--device", type=str, default="cuda:1", help="device to use")
-    parser.add_argument("--drop_text_encoder", action="store_true", default=None,
+    parser.add_argument("--drop_text_encoder", action=argparse.BooleanOptionalAction, default=None,
                         help="Drop text encoder weights to save memory")
     parser.add_argument("--unfreeze_encoder_layers", type=int, default=0,
                         help="Unfreeze last N vision transformer blocks for fine-tuning")

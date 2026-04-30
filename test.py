@@ -245,7 +245,7 @@ if __name__ == '__main__':
     parser.add_argument("--embed_dim", type=int, default=None, help="Override backbone embedding dimension")
     parser.add_argument("--transformer_layers", type=int, default=None, help="Override backbone transformer depth")
     parser.add_argument("--image_size", type=int, default=None, help="image size")
-    parser.add_argument("--drop_text_encoder", action="store_true", default=None,
+    parser.add_argument("--drop_text_encoder", action=argparse.BooleanOptionalAction, default=None,
                         help="Drop text encoder weights to save memory")
     parser.add_argument("--enable_analysis", action="store_true", help="enable data analysis and visualization")
     parser.add_argument("--seed", type=int, default=42, help="random seed")

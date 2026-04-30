@@ -17,3 +17,6 @@ Run the minimal forward/loss check:
 ```
 python -m unittest discover -s tests
 ```
+
+## Notes
+- Feature transform factories now require an explicit `input_dim` (use `model.visual.embed_dim`).

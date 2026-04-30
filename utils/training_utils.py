@@ -10,6 +10,13 @@ def _get_encoder_resblocks(model):
     return list(getattr(model.visual.transformer, "resblocks", []))
 
 
+def _select_last_blocks(blocks, count: int):
+    if count <= 0:
+        return []
+    start = max(0, len(blocks) - count)
+    return blocks[start:]
+
+
 def print_training_parameters(args, logger):
     """Print all training parameters before starting training"""
     logger.info(f"Training: {args.train_dataset} | Backbone: {args.backbone} | "
@@ -50,8 +57,7 @@ def setup_model_training(model, unfreeze_encoder_layers: int = 0):
 
     if unfreeze_encoder_layers > 0:
         blocks = _get_encoder_resblocks(model)
-        num_blocks = len(blocks)
-        for block in blocks[max(0, num_blocks - unfreeze_encoder_layers):]:
+        for block in _select_last_blocks(blocks, unfreeze_encoder_layers):
             for param in block.parameters():
                 param.requires_grad = True
 
@@ -87,9 +93,8 @@ def create_optimizer(model, layer_transforms, args, cross_attn=None, unfreeze_en
 
     if unfreeze_encoder_layers > 0:
         blocks = _get_encoder_resblocks(model)
-        num_blocks = len(blocks)
         encoder_params = []
-        for block in blocks[max(0, num_blocks - unfreeze_encoder_layers):]:
+        for block in _select_last_blocks(blocks, unfreeze_encoder_layers):
             encoder_params.extend(list(block.parameters()))
         if encoder_params:
             optimizer_params.append({
