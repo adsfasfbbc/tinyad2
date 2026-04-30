@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import numpy as np
 import yaml
@@ -157,7 +157,7 @@ def load_backbone_settings_from_config(
     config_path: Optional[str],
     backbone: str,
     logger=None,
-) -> Dict[str, object]:
+) -> Dict[str, Any]:
     """Load backbone settings (e.g., embed_dim, image_size) from a YAML config."""
 
     if not config_path:
@@ -196,3 +196,16 @@ DEFAULT_IMAGE_SIZE = 336
 
 def is_tinyclip(backbone: Optional[str]) -> bool:
     return bool(backbone) and backbone.lower().startswith("tinyclip")
+
+
+def apply_backbone_defaults(args, logger=None) -> None:
+    if args.image_size is None:
+        args.image_size = DEFAULT_IMAGE_SIZE
+    if args.drop_text_encoder is None:
+        args.drop_text_encoder = is_tinyclip(args.backbone)
+    if is_tinyclip(args.backbone) and args.backbone_weights is None:
+        _log(
+            logger,
+            "warning",
+            "TinyCLIP backbone selected without weights; set --backbone_weights to a checkpoint path/URL.",
+        )

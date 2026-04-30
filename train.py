@@ -18,10 +18,9 @@ import random
 from utils.transforms import get_transform
 from utils.scoring import reduce_anomaly_map, DEFAULT_TOPK_RATIO
 from utils.backbone_config import (
-    DEFAULT_IMAGE_SIZE,
+    apply_backbone_defaults,
     load_backbone_settings_from_config,
     load_feature_layers_from_config,
-    is_tinyclip,
     resolve_features_list,
 )
 torch.use_deterministic_algorithms(True,warn_only=False)
@@ -56,12 +55,7 @@ def apply_backbone_config(args, logger):
         if args.drop_text_encoder is None:
             args.drop_text_encoder = settings.get("drop_text_encoder")
 
-    if args.image_size is None:
-        args.image_size = DEFAULT_IMAGE_SIZE
-    if args.drop_text_encoder is None:
-        args.drop_text_encoder = is_tinyclip(args.backbone)
-    if is_tinyclip(args.backbone) and args.backbone_weights is None:
-        logger.warning("TinyCLIP backbone selected without weights; set --backbone_weights to a checkpoint path/URL.")
+    apply_backbone_defaults(args, logger)
 
 def generate_anomaly_map_from_tokens(anomaly_features, normal_features, patch_tokens, image_size):
     """

@@ -17,10 +17,9 @@ from utils.analysis import get_classification_from_segmentation, analyze_classif
 from utils.visualization import visualize_anomaly_results
 from utils.anomaly_detection import generate_anomaly_map_from_tokens
 from utils.backbone_config import (
-    DEFAULT_IMAGE_SIZE,
+    apply_backbone_defaults,
     load_backbone_settings_from_config,
     load_feature_layers_from_config,
-    is_tinyclip,
     resolve_features_list,
 )
 
@@ -53,12 +52,7 @@ def apply_backbone_config(args, logger):
         if args.drop_text_encoder is None:
             args.drop_text_encoder = settings.get("drop_text_encoder")
 
-    if args.image_size is None:
-        args.image_size = DEFAULT_IMAGE_SIZE
-    if args.drop_text_encoder is None:
-        args.drop_text_encoder = is_tinyclip(args.backbone)
-    if is_tinyclip(args.backbone) and args.backbone_weights is None:
-        logger.warning("TinyCLIP backbone selected without weights; set --backbone_weights to a checkpoint path/URL.")
+    apply_backbone_defaults(args, logger)
 
 def test(args):
     logger = get_logger(args.save_path)

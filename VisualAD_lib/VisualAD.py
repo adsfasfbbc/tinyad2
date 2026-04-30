@@ -7,6 +7,16 @@ from torch import nn
 
 
 
+TEXT_ENCODER_ATTRIBUTES = (
+    "transformer",
+    "token_embedding",
+    "positional_embedding",
+    "ln_final",
+    "text_projection",
+    "logit_scale",
+)
+
+
 class LayerNorm(nn.LayerNorm):
     """Subclass torch's LayerNorm to handle fp16."""
 
@@ -215,12 +225,8 @@ class VisualAD(nn.Module):
         else:
             self.context_length = 0
             self.vocab_size = 0
-            self.transformer = None
-            self.token_embedding = None
-            self.positional_embedding = None
-            self.ln_final = None
-            self.text_projection = None
-            self.logit_scale = None
+            for name in TEXT_ENCODER_ATTRIBUTES:
+                setattr(self, name, None)
 
     def initialize_parameters(self):
         """Initialize text encoder parameters when enabled."""
@@ -251,14 +257,7 @@ class VisualAD(nn.Module):
 
     def drop_text_encoder(self):
         """Remove text encoder modules to reduce memory footprint."""
-        for name in [
-            "transformer",
-            "token_embedding",
-            "positional_embedding",
-            "ln_final",
-            "text_projection",
-            "logit_scale",
-        ]:
+        for name in TEXT_ENCODER_ATTRIBUTES:
             if hasattr(self, name):
                 setattr(self, name, None)
         self.context_length = 0

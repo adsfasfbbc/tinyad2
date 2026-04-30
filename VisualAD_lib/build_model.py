@@ -2,6 +2,13 @@ import torch
 from torch import nn
 from .VisualAD import VisualAD
 
+TEXT_ENCODER_KEYS = (
+    "text_projection",
+    "positional_embedding",
+    "token_embedding.weight",
+    "ln_final.weight",
+)
+
 def build_model(name: str, state_dict: dict, design_details=None, drop_text_encoder: bool = False):
     vit = "visual.proj" in state_dict
     
@@ -32,15 +39,7 @@ def build_model(name: str, state_dict: dict, design_details=None, drop_text_enco
                 "Unable to infer embed_dim from weights; provide embed_dim via design_details or backbone config."
             )
 
-    has_text = all(
-        key in state_dict
-        for key in [
-            "text_projection",
-            "positional_embedding",
-            "token_embedding.weight",
-            "ln_final.weight",
-        ]
-    )
+    has_text = all(key in state_dict for key in TEXT_ENCODER_KEYS)
     use_text = has_text and not drop_text_encoder
 
     context_length = state_dict["positional_embedding"].shape[0] if has_text else 0
