@@ -28,6 +28,7 @@ _MODELS = {
     "ViT-B/16": "https://openaipublic.azureedge.net/clip/models/5806e77cd80f8b59890b7e101eabd078d9fb84e6937f9e85e4ecb61988df416f/ViT-B-16.pt",
     "ViT-L/14": "https://openaipublic.azureedge.net/clip/models/b8cca3fd41ae0c99ba7e8951adf17d267cdb84cd88be6f7c2e0eca1737a03836/ViT-L-14.pt",
     "ViT-L/14@336px": "https://openaipublic.azureedge.net/clip/models/3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02/ViT-L-14-336px.pt",
+    "TinyCLIP-ViT-61M/32": "https://github.com/microsoft/TinyCLIP/releases/download/v1.0/TinyCLIP-ViT-61M-32-Text-29M-LAION400M.pt",
 }
 
 

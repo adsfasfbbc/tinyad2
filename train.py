@@ -385,7 +385,7 @@ if __name__ == '__main__':
     parser.add_argument("--train_data_path", type=str, default="/home/hyn/work/dataset/AD/mvtec", help="train dataset path")
     parser.add_argument("--save_path", type=str, default='./checkpoints', help='path to save results')
     parser.add_argument("--train_dataset", type=str, default='mvtec', help="train dataset name")
-    parser.add_argument("--backbone", type=str, default="ViT-L/14@336px",
+    parser.add_argument("--backbone", type=str, default="TinyCLIP-ViT-61M/32",
                         help="CLIP/TinyCLIP backbone name or checkpoint path")
     parser.add_argument("--backbone_config", type=str, default=os.path.join('configs', 'backbone_settings.yaml'),
                         help="YAML file specifying backbone settings (weights, layers, embed_dim, image_size)")

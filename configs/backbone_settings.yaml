@@ -1,3 +1,11 @@
+TinyCLIP-ViT-61M/32:
+  weights: https://github.com/microsoft/TinyCLIP/releases/download/v1.0/TinyCLIP-ViT-61M-32-Text-29M-LAION400M.pt
+  image_size: 224
+  embed_dim: 512
+  transformer_layers: 12
+  layers: [3, 6, 9, 12]
+  drop_text_encoder: true
+
 ViT-L/14@336px:
   weights: https://openaipublic.azureedge.net/clip/models/3035c92b350959924f9f00213499208652fc7ea050643e8b385c2dac08641f02/ViT-L-14-336px.pt
   image_size: 336
