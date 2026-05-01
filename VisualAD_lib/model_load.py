@@ -120,7 +120,7 @@ def load_state_dict(checkpoint_path: str, map_location='cpu'):
                 checkpoint = candidate
                 break
     state_dict = checkpoint
-    if state_dict:
+    if isinstance(state_dict, dict):
         prefixes = ("module.", "model.")
         stripped = True
         while stripped:
