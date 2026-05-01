@@ -106,12 +106,24 @@ def available_models() -> List[str]:
 
 def load_state_dict(checkpoint_path: str, map_location='cpu'):
     checkpoint = torch.load(checkpoint_path, map_location=map_location)
-    if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-        state_dict = checkpoint['state_dict']
-    else:
-        state_dict = checkpoint
-    if next(iter(state_dict.items()))[0].startswith('module'):
-        state_dict = {k[7:]: v for k, v in state_dict.items()}
+    if isinstance(checkpoint, dict):
+        for key in (
+            "state_dict",
+            "model",
+            "model_state",
+            "model_state_dict",
+            "state_dict_ema",
+            "model_ema",
+        ):
+            candidate = checkpoint.get(key)
+            if isinstance(candidate, dict):
+                checkpoint = candidate
+                break
+    state_dict = checkpoint
+    if state_dict:
+        for prefix in ("module.", "model."):
+            if all(key.startswith(prefix) for key in state_dict):
+                state_dict = {k[len(prefix):]: v for k, v in state_dict.items()}
     return state_dict
 
 
@@ -173,17 +185,16 @@ def load(
     else:
         raise RuntimeError(f"Model {name} not found; available models = {available_models()}")
 
-    with open(model_path, 'rb') as opened_file:
-        try:
-            # loading JIT archive
-            model = torch.jit.load(opened_file, map_location=device if jit else "cpu").eval()
-            state_dict = None
-        except RuntimeError:
-            # loading saved state dict
-            if jit:
-                warnings.warn(f"File {model_path} is not a JIT archive. Loading as a state dict instead")
-                jit = False
-            state_dict = torch.load(opened_file, map_location="cpu")
+    try:
+        # loading JIT archive
+        model = torch.jit.load(model_path, map_location=device if jit else "cpu").eval()
+        state_dict = None
+    except RuntimeError:
+        # loading saved state dict
+        if jit:
+            warnings.warn(f"File {model_path} is not a JIT archive. Loading as a state dict instead")
+            jit = False
+        state_dict = load_state_dict(model_path, map_location="cpu")
 
     if not jit:
         model = build_model(
