@@ -121,9 +121,15 @@ def load_state_dict(checkpoint_path: str, map_location='cpu'):
                 break
     state_dict = checkpoint
     if state_dict:
-        for prefix in ("module.", "model."):
-            if all(key.startswith(prefix) for key in state_dict):
-                state_dict = {k[len(prefix):]: v for k, v in state_dict.items()}
+        prefixes = ("module.", "model.")
+        stripped = True
+        while stripped:
+            stripped = False
+            for prefix in prefixes:
+                if all(key.startswith(prefix) for key in state_dict):
+                    state_dict = {k[len(prefix):]: v for k, v in state_dict.items()}
+                    stripped = True
+                    break
     return state_dict
 
 
@@ -186,7 +192,7 @@ def load(
         raise RuntimeError(f"Model {name} not found; available models = {available_models()}")
 
     try:
-        # loading JIT archive
+        # attempt loading JIT archive
         model = torch.jit.load(model_path, map_location=device if jit else "cpu").eval()
         state_dict = None
     except RuntimeError:
